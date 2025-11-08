@@ -280,7 +280,7 @@ The dataset is preprocessed automatically:
 2. **Training Data Creation**: Training prompts are generated automatically
 3. **Query Understanding**: User messages are analyzed for product queries, brands, and budgets
 4. **Out-of-Scope Detection**: Detects queries about non-appliance products (phones, laptops, TVs, etc.) and provides helpful guidance
-5. **Response Generation**: 
+5. **Response Generation**:
    - **LLM Mode**: GPT-2 generates natural, conversational responses with optimized temperature and sampling
    - **Rule-Based Mode**: Friendly fallback responses for common patterns
    - **Natural Language**: Casual, friendly tone that feels like talking to a friend
@@ -311,10 +311,15 @@ The dataset is preprocessed automatically:
   - **Purpose**: Natural language understanding and response generation
   - **Model Size**: ~500MB
   - **Features**:
-    - Conversational responses
+    - Natural, conversational responses with casual, friendly tone
     - Product query understanding
+    - Out-of-scope query detection and handling
     - Integration with recommendation engine
     - Knowledge base context
+    - Optimized parameters: temperature=0.8, top_p=0.9 for natural variation
+    - Multi-sentence responses for better conversation flow
+    - **Completely Free**: Runs locally, no API costs, no usage limits
+    - **Note**: Can be upgraded to better local models (Ollama, DialoGPT, Phi-2) for improved quality
 
 - **TF-IDF (Term Frequency-Inverse Document Frequency)**: Weights terms based on their importance (fallback when GenAI not available)
 - **Cosine Similarity**: Measures the angle between vectors (0 = identical, 1 = completely different)
