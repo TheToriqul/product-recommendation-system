@@ -201,6 +201,67 @@ class ProductChatbot:
                 self.use_llm = False
                 self.pipeline = None
     
+    def _is_out_of_scope(self, user_message: str) -> bool:
+        """
+        Check if user message is about products outside our scope (home appliances).
+        
+        Args:
+            user_message: User's message
+            
+        Returns:
+            True if message is about non-appliance products, False otherwise
+        """
+        message_lower = user_message.lower()
+        
+        # Keywords for products outside our scope
+        out_of_scope_keywords = [
+            # Mobile devices
+            'mobile phone', 'smartphone', 'cell phone', 'iphone', 'android phone',
+            'tablet', 'ipad', 'phone',
+            # Computers
+            'laptop', 'computer', 'pc', 'desktop', 'macbook', 'notebook',
+            # TVs and displays
+            'tv', 'television', 'smart tv', 'monitor', 'display', 'screen',
+            # Gaming
+            'gaming console', 'playstation', 'xbox', 'nintendo', 'playstation',
+            'video game', 'game console',
+            # Cameras
+            'camera', 'dslr', 'mirrorless', 'photography', 'lens',
+            # Audio (non-appliance)
+            'headphone', 'earphone', 'earbud', 'speaker', 'bluetooth speaker',
+            # Other electronics
+            'smartwatch', 'watch', 'fitness tracker', 'drone',
+            # Clothing and fashion
+            'clothes', 'clothing', 'shirt', 'pants', 'shoes', 'fashion',
+            # Food and beverages
+            'food', 'restaurant', 'recipe', 'cooking recipe',
+            # Vehicles
+            'car', 'vehicle', 'automobile', 'motorcycle', 'bike',
+            # Books and media
+            'book', 'movie', 'music', 'song', 'album'
+        ]
+        
+        # Check if message contains out-of-scope keywords
+        for keyword in out_of_scope_keywords:
+            if keyword in message_lower:
+                # Double-check: make sure it's not about home appliances
+                # Some words might overlap (e.g., "oven" in "microwave oven")
+                appliance_keywords = [
+                    'refrigerator', 'fridge', 'washing machine', 'washer', 'dryer',
+                    'air conditioner', 'ac', 'microwave', 'oven', 'dishwasher',
+                    'vacuum', 'blender', 'mixer', 'toaster', 'coffee maker',
+                    'appliance', 'home appliance'
+                ]
+                
+                # If it's clearly an appliance query, it's in scope
+                if any(appliance in message_lower for appliance in appliance_keywords):
+                    return False
+                
+                # Otherwise, it's out of scope
+                return True
+        
+        return False
+    
     def generate_response(self, user_message: str, context: Optional[str] = None) -> str:
         """
         Generate a chatbot response to user message.
@@ -213,7 +274,21 @@ class ProductChatbot:
             Chatbot response string
         """
         if not user_message.strip():
-            return "Please ask me a question about products!"
+            return "Hey! What can I help you find today?"
+        
+        # Check if query is out of scope (not about home appliances)
+        if self._is_out_of_scope(user_message):
+            return ("I'm sorry, but I specialize in home appliances only (refrigerators, washing machines, "
+                   "air conditioners, microwaves, etc.). I don't have information about mobile phones, "
+                   "electronics, or other products outside of home appliances.\n\n"
+                   "Please read the README to know what we recommend. I can help you find:\n"
+                   "• Refrigerators and freezers\n"
+                   "• Washing machines and dryers\n"
+                   "• Air conditioners\n"
+                   "• Microwaves and ovens\n"
+                   "• Dishwashers\n"
+                   "• And other home appliances\n\n"
+                   "What home appliance are you looking for?")
         
         # Check if user is asking for product recommendations
         message_lower = user_message.lower()
@@ -242,43 +317,34 @@ class ProductChatbot:
             brand = self._extract_brand_from_message(user_message)
             kb_context = self.knowledge_base.get_product_context(product_type, brand)
             
-            # Enhanced prompt template
+            # Enhanced prompt template - more conversational and natural
             brands = ', '.join(self.knowledge_base.get_available_brands()[:10])
-            prompt = f"""You are a helpful AI assistant for a product recommendation system specializing in home appliances.
+            prompt = f"""You are a friendly and helpful AI assistant that helps people find home appliances. Chat naturally and be conversational.
 
-KNOWLEDGE BASE:
-- Available brands: {brands}
-- Context: {kb_context}
+Available brands: {brands}
+Context: {kb_context}
 
-YOUR CAPABILITIES:
-1. Help users find products by type, brand, or budget
-2. Answer questions about available products and brands
-3. Provide product recommendations based on user needs
-4. Guide users on how to use the search features
-
-RESPONSE GUIDELINES:
-- Be friendly, helpful, and concise
-- When users ask for products, acknowledge their request
-- If you can provide specific recommendations, do so
-- Always be professional and product-focused
+You can help users find products, answer questions about brands, and give recommendations. Be friendly, casual, and talk like a normal person would. Keep responses natural and not too formal.
 
 User: {user_message}
 Assistant:"""
         elif context:
-            prompt = f"Context: {context}\n\nUser: {user_message}\nAssistant:"
+            prompt = f"You're a friendly AI assistant helping with home appliances. Chat naturally.\n\nContext: {context}\n\nUser: {user_message}\nAssistant:"
         else:
-            # Create a product-focused prompt
-            prompt = f"You are a helpful assistant for a product recommendation system. Answer questions about electrical appliances and products.\n\nUser: {user_message}\nAssistant:"
+            # Create a more conversational prompt
+            prompt = f"You're a friendly AI assistant that helps people find home appliances. Chat naturally and be helpful.\n\nUser: {user_message}\nAssistant:"
         
         if self.use_llm and self.pipeline:
             try:
-                # Generate response using LLM
+                # Generate response using LLM - allow longer, more natural responses
                 response = self.pipeline(
                     prompt,
-                    max_new_tokens=80,
+                    max_new_tokens=120,  # Increased for more natural conversation
                     num_return_sequences=1,
                     pad_token_id=50256,  # GPT-2 pad token
-                    eos_token_id=50256
+                    eos_token_id=50256,
+                    temperature=0.8,  # Slightly higher for more natural variation
+                    top_p=0.9
                 )
                 
                 # Extract generated text
@@ -290,10 +356,19 @@ Assistant:"""
                     # If no "Assistant:" marker, take text after the prompt
                     assistant_response = generated_text[len(prompt):].strip()
                 
-                # Clean up the response - take first sentence or first 200 chars
-                assistant_response = assistant_response.split("\n")[0].strip()
-                assistant_response = assistant_response.split(".")[0] + "." if "." in assistant_response else assistant_response
-                assistant_response = assistant_response[:200].strip()
+                # Clean up the response - allow longer, more natural responses
+                # Take up to 2-3 sentences for more natural conversation
+                sentences = assistant_response.split(".")
+                if len(sentences) > 1:
+                    # Take first 2-3 sentences for natural flow
+                    assistant_response = ". ".join(sentences[:3]).strip()
+                    if assistant_response and not assistant_response.endswith("."):
+                        assistant_response += "."
+                else:
+                    assistant_response = assistant_response.split("\n")[0].strip()
+                
+                # Limit to reasonable length but allow more than before
+                assistant_response = assistant_response[:300].strip()
                 
                 # If response is too short or empty, provide a fallback
                 if len(assistant_response) < 10 or not assistant_response:
@@ -319,79 +394,79 @@ Assistant:"""
         """
         message_lower = user_message.lower().strip()
         
-        # Greetings
+        # Greetings - more natural and casual
         if any(word in message_lower for word in ['hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening', 'greetings', 'howdy']):
-            return "Hello! 👋 I'm your AI assistant for product recommendations. I can help you find the perfect appliances. What are you looking for today?"
+            return "Hey there! 👋 I'm here to help you find home appliances. What are you looking for?"
         
-        # Thank you responses
+        # Thank you responses - more casual
         elif any(word in message_lower for word in ['thank', 'thanks', 'appreciate']):
-            return "You're very welcome! 😊 Happy shopping! If you need more help finding products, just ask!"
+            return "You're welcome! 😊 Happy to help. Let me know if you need anything else!"
         
-        # Goodbye responses
+        # Goodbye responses - more natural
         elif any(word in message_lower for word in ['goodbye', 'bye', 'see you', 'farewell', 'have a good day']):
-            return "Goodbye! 👋 Feel free to come back anytime if you need help finding products. Have a great day!"
+            return "See you later! 👋 Feel free to come back if you need help finding products. Have a great day!"
         
-        # How are you
+        # How are you - more conversational
         elif any(phrase in message_lower for phrase in ['how are you', 'how are you doing', 'how\'s it going', 'how do you do']):
-            return "I'm doing great, thank you for asking! 😊 I'm here and ready to help you find the perfect products. What can I assist you with today?"
+            return "I'm doing great, thanks! 😊 Ready to help you find some appliances. What can I help you with?"
         
-        # What can you do / capabilities
+        # What can you do / capabilities - more casual
         elif any(phrase in message_lower for phrase in ['what can you do', 'what do you do', 'what are your capabilities', 'what can you help with']):
-            return "I can help you:\n• Find products by type (refrigerators, washing machines, etc.)\n• Search by brand or budget\n• Answer questions about available products\n• Provide product recommendations\n\nWhat would you like to find?"
+            return "I can help you find home appliances like refrigerators, washing machines, air conditioners, and more. You can ask me to find products by type, brand, or budget. What are you looking for?"
         
-        # Who are you / introduction
+        # Who are you / introduction - more natural
         elif any(phrase in message_lower for phrase in ['who are you', 'what are you', 'introduce yourself', 'tell me about yourself']):
-            return "I'm your AI assistant for the Product Recommendation System! 🤖 I specialize in helping you find the perfect home appliances. I can search through thousands of products and provide personalized recommendations. How can I help you today?"
+            return "I'm an AI assistant that helps people find home appliances! 🤖 I can search through our product catalog and help you find what you need. What can I help you with today?"
         
-        # Yes / confirmation
+        # Yes / confirmation - more casual
         elif any(word in message_lower for word in ['yes', 'yeah', 'yep', 'sure', 'ok', 'okay', 'correct', 'right']):
-            return "Great! 😊 What would you like to do next? I can help you find products or answer any questions."
+            return "Cool! 😊 What would you like to do next? I can help you find products or answer questions."
         
-        # No / negative
+        # No / negative - more natural
         elif any(word in message_lower for word in ['no', 'nope', 'not really', 'not interested', 'don\'t want']):
-            return "No problem! Is there something else I can help you with? I'm here to assist with product recommendations whenever you need."
+            return "No worries! Is there something else I can help you with?"
         
-        # Need help
+        # Need help - more casual
         elif any(phrase in message_lower for phrase in ['i need help', 'can you help', 'help me', 'i need assistance', 'i\'m confused']):
-            return "Of course! I'm here to help. 😊 I can assist you with:\n• Finding specific products\n• Searching by brand or budget\n• Answering questions about our catalog\n\nWhat would you like help with?"
+            return "Sure thing! 😊 I can help you find products, search by brand or budget, or answer questions. What do you need help with?"
         
-        # Positive feedback
+        # Positive feedback - more natural
         elif any(word in message_lower for word in ['great', 'awesome', 'cool', 'nice', 'good', 'excellent', 'perfect', 'wonderful']):
-            return "I'm glad I could help! 😊 Is there anything else you'd like to know or find?"
+            return "Glad I could help! 😊 Anything else you'd like to know?"
         
-        # Don't understand
+        # Don't understand - more conversational
         elif any(phrase in message_lower for phrase in ['i don\'t understand', 'what do you mean', 'can you explain', 'i\'m confused', 'unclear']):
-            return "I apologize for the confusion. Let me clarify - I'm here to help you find products. You can ask me to find specific appliances, search by brand, or filter by budget. What would you like to search for?"
+            return "No worries! I'm here to help you find home appliances. You can ask me to find specific products, search by brand, or filter by budget. What are you looking for?"
         
-        # More information
+        # More information - more casual
         elif any(phrase in message_lower for phrase in ['tell me more', 'more information', 'more details', 'elaborate']):
-            return "I'd be happy to provide more details! What specific information would you like? I can tell you about products, brands, prices, or help you search for something specific."
+            return "Sure! What would you like to know more about? I can tell you about products, brands, prices, or help you search for something."
         
-        # Product-specific queries
+        # Product-specific queries - more natural
         elif any(word in message_lower for word in ['refrigerator', 'fridge']):
-            return "I can help you find refrigerators! 🧊 Try asking me to 'find me a refrigerator' or use the quick suggestions above. You can also filter by brand or budget!"
+            return "Sure! I can help you find refrigerators. 🧊 Just ask me to 'find me a refrigerator' and I'll show you options. You can also filter by brand or budget if you want!"
         elif any(word in message_lower for word in ['washing machine', 'washer']):
-            return "Looking for a washing machine? 🌀 I can help you find the perfect one! Try asking 'find me a washing machine' or use the search feature with filters."
+            return "Got it! I can help you find washing machines. 🌀 Try asking 'find me a washing machine' and I'll show you what's available."
         elif any(word in message_lower for word in ['air conditioner', 'ac']):
-            return "I can help you find air conditioners! ❄️ Search for 'air conditioner' and I'll show you options. You can filter by brand, budget, and more!"
+            return "Yep! I can help you find air conditioners. ❄️ Just ask me to find one and I'll show you options. You can filter by brand or budget too!"
         elif 'microwave' in message_lower:
-            return "Microwaves are available! 🔥 I can help you find one. Try asking 'find me a microwave' or use the search feature."
+            return "Sure thing! I can help you find microwaves. 🔥 Just ask me to 'find me a microwave' and I'll show you what's available."
         
-        # Help / how to use
+        # Help / how to use - more casual
         elif any(word in message_lower for word in ['help', 'how', 'how to', 'how do i']):
-            return "I can help you find products! Here's how:\n1. Ask me to find a product (e.g., 'find me a refrigerator')\n2. Use the quick suggestions above for common searches\n3. Specify brand or budget if needed\n4. I'll show you the best recommendations!\n\nWhat would you like to find?"
+            return "I can help you find home appliances! Just ask me things like:\n• 'Find me a refrigerator'\n• 'Show me washing machines under $500'\n• 'What brands do you have?'\n\nWhat are you looking for?"
         
-        # Top rated
+        # Top rated - more natural
         elif any(phrase in message_lower for phrase in ['top rated', 'best products', 'highest rated', 'most popular']):
-            return "I can show you top-rated products! ⭐ Try asking me to find a specific product type, and I'll show you the best options. For example: 'find me a refrigerator' or 'show me top rated washing machines'."
+            return "I can show you top-rated products! ⭐ Just ask me to find a specific product type and I'll show you the best options. For example: 'find me a refrigerator' or 'show me top rated washing machines'."
         
-        # Budget queries
+        # Budget queries - more casual
         elif any(phrase in message_lower for phrase in ['under $', 'less than $', 'budget', 'cheap', 'affordable']):
-            return "I can help you find products within your budget! 💰 Try asking like: 'find me a refrigerator under $500' or 'show me washing machines under $1000'. I'll filter the results for you!"
+            return "I can help you find products within your budget! 💰 Just ask like: 'find me a refrigerator under $500' or 'show me washing machines under $1000' and I'll filter the results for you."
         
-        # Default response
+        # Default response - more natural and conversational
         else:
-            return "I'm here to help you find products! 😊 Try asking me to find a specific appliance, or use the quick suggestions above. For example:\n• 'Find me a refrigerator'\n• 'Show me washing machines'\n• 'What brands are available?'\n\nWhat would you like to search for?"
+            return "I'm here to help you find home appliances! 😊 You can ask me things like:\n• 'Find me a refrigerator'\n• 'Show me washing machines'\n• 'What brands are available?'\n\nWhat are you looking for?"
     
     def _extract_product_type(self, user_message: str) -> Optional[str]:
         """
