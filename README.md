@@ -96,7 +96,10 @@ cd product-recommendation-system
 
 ```bash
 # Create virtual environment
+# On Windows:
 python -m venv venv
+# On macOS/Linux:
+python3 -m venv venv
 
 # Activate virtual environment
 # On Windows:
@@ -108,14 +111,22 @@ source venv/bin/activate
 ### Step 3: Install Dependencies
 
 ```bash
+# On Windows:
 pip install -r requirements.txt
+# On macOS/Linux:
+pip3 install -r requirements.txt
 ```
 
 ### Step 4: Run the Application
 
 ```bash
+# On Windows:
 python app_gui.py
+# On macOS/Linux:
+python3 app_gui.py
 ```
+
+**Note:** On macOS and Linux, use `python3` and `pip3`. On Windows, `python` and `pip` should work. If `python` doesn't work on Windows, try `py` or `python3`.
 
 The GUI application will launch automatically. No browser access needed - it's a desktop application!
 
