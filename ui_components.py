@@ -344,6 +344,11 @@ def create_results_section(parent: tk.Frame, use_advanced: bool) -> tuple:
         columns = ("Product Name", "Brand", "Price", "Rating", "Similarity", "View Product")
     else:
         columns = ("Product Name", "Brand", "Price", "Rating", "View Product")
+        
+    style = ttk.Style()
+    style.theme_use("clam")
+    style.configure("Treeview.Heading", background=BG_COLOR_CARD, foreground=FG_COLOR_WHITE, font=(FONT_FAMILY, 10, 'bold'))
+    style.map("Treeview.Heading", background=[("active", BUTTON_SECONDARY_HOVER)])
     
     tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=8)
     
