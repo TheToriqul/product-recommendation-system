@@ -261,11 +261,35 @@ def create_chatbot_panel(parent: tk.Frame, send_message_callback: Callable[[str]
     chat_container.bind("<Configure>", configure_scroll_region)
     chat_canvas.bind("<Configure>", configure_canvas_width)
     
-    # Mouse wheel scrolling
+    # Mouse wheel scrolling - bind to both canvas and container
     def on_mousewheel(event):
-        chat_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        # Handle Windows/Linux mouse wheel
+        if event.delta:
+            chat_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        # Handle macOS trackpad scrolling
+        elif event.num == 4:
+            chat_canvas.yview_scroll(-1, "units")
+        elif event.num == 5:
+            chat_canvas.yview_scroll(1, "units")
+        return "break"
     
-    chat_canvas.bind_all("<MouseWheel>", on_mousewheel)
+    def on_canvas_enter(event):
+        # Focus canvas when mouse enters to enable scrolling
+        chat_canvas.focus_set()
+    
+    # Bind mouse wheel events
+    chat_canvas.bind("<MouseWheel>", on_mousewheel)  # Windows/Linux
+    chat_canvas.bind("<Button-4>", on_mousewheel)    # macOS scroll up
+    chat_canvas.bind("<Button-5>", on_mousewheel)    # macOS scroll down
+    chat_canvas.bind("<Enter>", on_canvas_enter)     # Focus on enter
+    
+    # Also bind to chat container and frame
+    chat_frame.bind("<MouseWheel>", on_mousewheel)
+    chat_frame.bind("<Button-4>", on_mousewheel)
+    chat_frame.bind("<Button-5>", on_mousewheel)
+    chat_container.bind("<MouseWheel>", on_mousewheel)
+    chat_container.bind("<Button-4>", on_mousewheel)
+    chat_container.bind("<Button-5>", on_mousewheel)
     
     chat_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
     scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
