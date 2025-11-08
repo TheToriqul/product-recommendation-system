@@ -392,6 +392,9 @@ Try these chatbot queries:
 - "What brands are available?"
 - "Help me find products"
 - "I need a Samsung air conditioner"
+- "Hey, what can you do?" (tests conversational tone)
+- "Find me a laptop" (tests out-of-scope detection)
+- "How are you?" (tests natural conversation)
 
 ---
 
