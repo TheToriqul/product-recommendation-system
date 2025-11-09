@@ -10,6 +10,7 @@ import tkinter as tk
 from tkinter import messagebox
 from typing import List, Dict
 import os
+import threading
 
 from recommender_engine import ProductRecommender, GENAI_AVAILABLE
 
@@ -17,7 +18,7 @@ from recommender_engine import ProductRecommender, GENAI_AVAILABLE
 from ui_constants import (
     WINDOW_TITLE, WINDOW_SIZE, BG_COLOR_MAIN, BG_COLOR_DARK,
     BG_COLOR_INPUT, BG_COLOR_CARD,
-    FG_COLOR_WHITE,
+    FG_COLOR_WHITE, FG_COLOR_SECONDARY, SUCCESS_COLOR,
     FONT_FAMILY, FONT_SIZE_NORMAL,
     BUTTON_PRIMARY
 )
@@ -31,16 +32,21 @@ from ui_handlers import (
     show_similar_products, perform_search
 )
 
+# Configure logging FIRST (before any logger usage)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 # Import chatbot modules
 try:
-    from chatbot import ProductChatbot, LLM_AVAILABLE as CHATBOT_LLM_AVAILABLE
+    from chatbot import ProductChatbot
     from chatbot_ui import create_chatbot_panel
     CHATBOT_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"Chatbot modules not available: {e}")
     CHATBOT_AVAILABLE = False
-    ProductChatbot = None
-    create_chatbot_panel = None
 
 # Check if NLTK is available for advanced features
 try:
@@ -48,13 +54,6 @@ try:
     NLTK_AVAILABLE = True
 except ImportError:
     NLTK_AVAILABLE = False
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 
 class ProdRecommendationApp:
@@ -78,20 +77,21 @@ class ProdRecommendationApp:
         # Enable advanced mode if NLTK or GenAI is available
         self.use_advanced = use_advanced and (NLTK_AVAILABLE or GENAI_AVAILABLE)
         
-        # Initialize recommender with error handling
+        # Initialize recommender with error handling (load dataset only, models in background)
         try:
             if self.use_advanced:
-                logger.info("Initializing product recommender with advanced AI and Generative AI features...")
+                logger.info("Initializing product recommender (dataset only, models will load in background)...")
                 self.engine = ProductRecommender(
                     use_ngrams=True,
                     use_advanced_preprocessing=True,
                     use_genai=True,  # Enable Generative AI
-                    feature_weights={'product_name': 0.7, 'brand': 0.3}
+                    feature_weights={'product_name': 0.7, 'brand': 0.3},
+                    load_models_immediately=False  # Defer model loading to background
                 )
-                logger.info("Advanced product recommender with Generative AI initialized successfully")
+                logger.info("Dataset loaded - models will load in background")
             else:
-                self.engine = ProductRecommender()
-                logger.info("Basic product recommender initialized successfully")
+                self.engine = ProductRecommender(load_models_immediately=False)
+                logger.info("Dataset loaded - models will load in background")
         except FileNotFoundError as e:
             logger.error(f"Failed to initialize recommender: {e}")
             messagebox.showerror(
@@ -124,17 +124,14 @@ class ProdRecommendationApp:
                 root.destroy()
                 return
         
-        # Initialize chatbot if available (after engine is ready)
+        # Initialize chatbot lazily (only when needed) to speed up startup
+        # Chatbot will be initialized when user switches to chat tab
         self.chatbot = None
-        if CHATBOT_AVAILABLE:
-            try:
-                logger.info("Initializing chatbot with product recommendation capabilities...")
-                # Pass the recommender engine to chatbot so it can recommend products
-                self.chatbot = ProductChatbot(use_llm=True, recommender_engine=self.engine)
-                logger.info("Chatbot initialized successfully with product recommendation support")
-            except Exception as e:
-                logger.warning(f"Failed to initialize chatbot: {e}")
-                self.chatbot = None
+        self._chatbot_initialized = False
+        
+        # Track model loading status
+        self._models_loading = False
+        self._models_loaded = False
         
         self._setup_window()
         self._create_ui()
@@ -142,14 +139,18 @@ class ProdRecommendationApp:
         # Bind Enter key to search
         self.product_entry.bind('<Return>', lambda e: self.send_message())
         logger.info("Application initialized successfully")
+        
+        # Start background loading of models/embeddings
+        self._start_background_model_loading()
     
     def _setup_window(self) -> None:
         """Configure the main window."""
         self.root.title(WINDOW_TITLE)
         self.root.geometry(WINDOW_SIZE)
         self.root.configure(bg=BG_COLOR_DARK)
-        # Set minimum window size
-        self.root.minsize(1000, 700)
+        # Set minimum window size - optimized for 1280x720 default size
+        # Minimum width: 1100px, Minimum height: 650px (ensures all elements are visible)
+        self.root.minsize(1100, 650)
         # Center window on screen
         self.root.update_idletasks()
         width = self.root.winfo_width()
@@ -175,6 +176,17 @@ class ProdRecommendationApp:
         # Search tab
         search_tab = tk.Frame(self.notebook, bg=self.bgcolor)
         self.notebook.add(search_tab, text="🔍 Search Products")
+        
+        # Create status label for model loading (shown at top of search tab)
+        self.status_label = tk.Label(
+            search_tab,
+            text="⏳ Loading AI models in background... (Search available with basic mode)",
+            bg=self.bgcolor,
+            fg=FG_COLOR_SECONDARY,
+            font=(FONT_FAMILY, FONT_SIZE_NORMAL - 1),
+            pady=8
+        )
+        self.status_label.pack(fill=tk.X, padx=20, pady=(10, 0))
         
         # Create input section
         self.product_entry_var = tk.StringVar()
@@ -211,16 +223,22 @@ class ProdRecommendationApp:
         # Store current results for chatbot context
         self.current_results: List[Dict[str, str]] = []
         
-        # Chatbot tab (if available)
-        if CHATBOT_AVAILABLE and self.chatbot:
+        # Chatbot tab (if available) - lazy initialization
+        if CHATBOT_AVAILABLE:
             chat_tab = tk.Frame(self.notebook, bg=self.bgcolor)
             self.notebook.add(chat_tab, text="💬 AI Assistant")
             
-            # Create chatbot panel
+            # Create chatbot panel (chatbot will be initialized when tab is accessed)
             self.chat_display, self.chat_entry, self.chat_send_button = create_chatbot_panel(
                 chat_tab,
                 self._get_chatbot_response
             )
+            
+            # Bind tab change event to lazy-load chatbot
+            def on_tab_changed(event):
+                if event.widget.index("current") == 1:  # Chat tab is index 1
+                    self._initialize_chatbot_lazy()
+            self.notebook.bind("<<NotebookTabChanged>>", on_tab_changed)
         
         # Apply styles
         apply_styles()
@@ -242,6 +260,55 @@ class ProdRecommendationApp:
                 )
         except Exception as e:
             logger.debug(f"Could not force button colors: {e}")
+    
+    def _start_background_model_loading(self) -> None:
+        """Start background thread to load AI models and embeddings."""
+        if self._models_loading or self._models_loaded:
+            return
+        
+        self._models_loading = True
+        
+        def load_models():
+            """Background thread function to load models."""
+            try:
+                logger.info("Starting background loading of AI models and embeddings...")
+                self.engine.load_models_and_embeddings()
+                self._models_loaded = True
+                self._models_loading = False
+                logger.info("✓ Background model loading completed successfully")
+                
+                # Update UI in main thread
+                self.root.after(0, self._on_models_loaded)
+            except Exception as e:
+                logger.error(f"Error loading models in background: {e}", exc_info=True)
+                self._models_loading = False
+                # Update UI to show error
+                self.root.after(0, lambda: self._on_models_load_error(str(e)))
+        
+        # Start background thread
+        thread = threading.Thread(target=load_models, daemon=True)
+        thread.start()
+        logger.info("Background model loading thread started")
+    
+    def _on_models_loaded(self) -> None:
+        """Update UI when models are loaded successfully."""
+        if hasattr(self, 'status_label'):
+            self.status_label.config(
+                text="✓ AI models loaded successfully! Enhanced search is now available.",
+                fg=SUCCESS_COLOR
+            )
+            # Hide status label after 3 seconds
+            self.root.after(3000, lambda: self.status_label.pack_forget())
+        logger.info("UI updated: Models loaded successfully")
+    
+    def _on_models_load_error(self, error_msg: str) -> None:
+        """Update UI when model loading fails."""
+        if hasattr(self, 'status_label'):
+            self.status_label.config(
+                text=f"⚠️ Model loading failed. Using basic search mode. Error: {error_msg[:50]}...",
+                fg=FG_COLOR_SECONDARY
+            )
+        logger.warning(f"Model loading failed: {error_msg}")
     
     def show_similar_products_below(
         self, 
@@ -275,9 +342,25 @@ class ProdRecommendationApp:
             self.tree,
             self.similar_tree,
             self.engine,
-            self.use_advanced,
-            None  # No export button state update needed
+            self.use_advanced
         )
+    
+    def _initialize_chatbot_lazy(self) -> None:
+        """Lazy initialization of chatbot - only when chat tab is accessed."""
+        if self._chatbot_initialized:
+            return
+        
+        if not CHATBOT_AVAILABLE:
+            return
+        
+        try:
+            logger.info("Initializing chatbot (lazy load)...")
+            self.chatbot = ProductChatbot(use_llm=True, recommender_engine=self.engine)
+            self._chatbot_initialized = True
+            logger.info("Chatbot initialized successfully")
+        except Exception as e:
+            logger.warning(f"Failed to initialize chatbot: {e}")
+            self.chatbot = None
     
     def _get_chatbot_response(self, user_message: str) -> str:
         """
@@ -289,6 +372,10 @@ class ProdRecommendationApp:
         Returns:
             Chatbot response string
         """
+        # Initialize chatbot if not already initialized
+        if not self._chatbot_initialized:
+            self._initialize_chatbot_lazy()
+        
         if self.chatbot:
             # Get context from current search if available
             context = None

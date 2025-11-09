@@ -6,7 +6,7 @@ This module contains all UI-related constants including colors, fonts, sizes, an
 
 # Window Configuration
 WINDOW_TITLE = "AI-Powered Product Recommendation System"
-WINDOW_SIZE = "1280x720"  # Standard recommended size for desktop applications
+WINDOW_SIZE = "1280x720"  # Optimized to show all UI elements and table rows within this size
 
 # Color Scheme - Modern Dark Theme
 BG_COLOR_MAIN = '#1a1a2e'  # Modern dark blue-gray
@@ -20,8 +20,6 @@ FG_COLOR_WHITE = '#ffffff'
 FG_COLOR_TEXT = '#e5e7eb'  # Soft white
 FG_COLOR_SECONDARY = '#9ca3af'  # Secondary text
 ACCENT_COLOR = '#3b82f6'  # Modern blue
-ACCENT_COLOR_HOVER = '#2563eb'
-ACCENT_COLOR_ACTIVE = '#1d4ed8'
 SUCCESS_COLOR = '#10b981'
 
 # Button Colors - Custom Brown/Tan Theme
@@ -31,11 +29,6 @@ BUTTON_PRIMARY_ACTIVE = '#5d5137'  # Even darker when clicked
 BUTTON_SECONDARY = '#06b6d4'  # Vibrant cyan/teal
 BUTTON_SECONDARY_HOVER = '#0891b2'  # Darker cyan on hover
 BUTTON_SECONDARY_ACTIVE = '#0e7490'  # Even darker when clicked
-
-# Legacy support
-BUTTON_COLOR = BUTTON_PRIMARY
-BUTTON_COLOR_ACTIVE = BUTTON_PRIMARY_ACTIVE
-BUTTON_COLOR_HOVER = BUTTON_PRIMARY_HOVER
 
 # Typography
 FONT_FAMILY = 'Segoe UI'

@@ -285,26 +285,73 @@ def create_input_section(
     send_button.bind("<Leave>", on_leave)
     send_button.pack(side=tk.RIGHT, padx=(15, 0), pady=8)
     
-    def update_brand_dropdown(event: Optional[tk.Event] = None) -> None:
-        """Update brand dropdown based on product entry."""
-        product = product_entry_var.get().strip()
-        try:
-            if product:
-                brands = engine.get_available_brands(product)
-                brand_values = ["All Brands"] + brands
-                brand_combo['values'] = brand_values
-                current_brand = brand_var.get()
-                if current_brand not in brand_values:
-                    brand_combo.set("All Brands")
-            else:
-                all_brands = engine.get_available_brands("")
-                brand_values = ["All Brands"] + all_brands
-                brand_combo['values'] = brand_values
-                brand_combo.set("All Brands")
-        except Exception as e:
-            logger.error(f"Error updating brand dropdown: {e}", exc_info=True)
+    # Debouncing for brand dropdown update (professional best practice)
+    # Prevents excessive updates while user is typing
+    _update_timer_id = None
     
+    def update_brand_dropdown(event: Optional[tk.Event] = None, immediate: bool = False) -> None:
+        """Update brand dropdown based on product entry with debouncing."""
+        nonlocal _update_timer_id
+        
+        def do_update():
+            try:
+                product = product_entry_var.get().strip()
+                if product:
+                    # Filter brands to show only those with matching products
+                    brands = engine.get_available_brands(product)
+                    if brands:  # Only update if we got brands
+                        brand_values = ["All Brands"] + brands
+                        brand_combo['values'] = brand_values
+                        current_brand = brand_var.get()
+                        # Reset to "All Brands" if current selection is not in filtered list
+                        if current_brand not in brand_values:
+                            brand_combo.set("All Brands")
+                    else:
+                        # If no brands found, show all brands as fallback
+                        all_brands = engine.get_available_brands("")
+                        if all_brands:
+                            brand_values = ["All Brands"] + all_brands
+                            brand_combo['values'] = brand_values
+                            brand_combo.set("All Brands")
+                else:
+                    # Show all brands when product field is empty
+                    all_brands = engine.get_available_brands("")
+                    if all_brands:  # Only update if we got brands
+                        brand_values = ["All Brands"] + all_brands
+                        brand_combo['values'] = brand_values
+                        brand_combo.set("All Brands")
+            except Exception as e:
+                logger.error(f"Error updating brand dropdown: {e}", exc_info=True)
+        
+        # If immediate update requested (e.g., field cleared), update right away
+        if immediate:
+            # Cancel any pending updates
+            if _update_timer_id is not None:
+                try:
+                    product_entry.after_cancel(_update_timer_id)
+                except:
+                    pass
+            do_update()
+            return
+        
+        # Cancel previous timer if user is still typing
+        if _update_timer_id is not None:
+            try:
+                product_entry.after_cancel(_update_timer_id)
+            except:
+                pass  # Timer might have already fired
+        
+        # Schedule update after 200ms of no typing (debouncing - reduced for better responsiveness)
+        _update_timer_id = product_entry.after(200, do_update)
+    
+    # Bind to both KeyRelease and when field loses focus for immediate update
     product_entry.bind('<KeyRelease>', update_brand_dropdown)
+    
+    def on_focus_out(event):
+        """Update brand dropdown when field loses focus - immediate update."""
+        update_brand_dropdown(event, immediate=True)
+    
+    product_entry.bind('<FocusOut>', on_focus_out)
     
     return product_entry, brand_combo, send_button
 
@@ -321,13 +368,13 @@ def create_results_section(parent: tk.Frame, use_advanced: bool) -> tuple:
         Tuple of (content_container frame, tree widget)
     """
     content_container = tk.Frame(parent, bg=BG_COLOR_CARD)
-    content_container.pack(fill=tk.BOTH, expand=True, padx=25, pady=(0, 10))
+    content_container.pack(fill=tk.BOTH, expand=True, padx=25, pady=(0, 8))
     
     results_card = tk.Frame(content_container, bg=BG_COLOR_CARD, relief=tk.FLAT, bd=0)
     results_card.pack(fill=tk.BOTH, expand=True)
     
     results_header = tk.Frame(results_card, bg=BG_COLOR_CARD)
-    results_header.pack(fill=tk.X, padx=20, pady=(15, 10))
+    results_header.pack(fill=tk.X, padx=20, pady=(12, 8))
     
     tk.Label(
         results_header,
@@ -337,8 +384,13 @@ def create_results_section(parent: tk.Frame, use_advanced: bool) -> tuple:
         bg=BG_COLOR_CARD
     ).pack(side=tk.LEFT)
     
+    # Create a frame for the table with scrollbar
     table_frame = tk.Frame(results_card, bg=BG_COLOR_CARD)
-    table_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 15))
+    table_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 10))
+    
+    # Create a container for treeview and scrollbar using grid for better control
+    table_container = tk.Frame(table_frame, bg=BG_COLOR_CARD)
+    table_container.pack(fill=tk.BOTH, expand=True)
     
     if use_advanced:
         columns = ("Product Name", "Brand", "Price", "Rating", "Similarity", "View Product")
@@ -350,24 +402,32 @@ def create_results_section(parent: tk.Frame, use_advanced: bool) -> tuple:
     style.configure("Treeview.Heading", background=BG_COLOR_CARD, foreground=FG_COLOR_WHITE, font=(FONT_FAMILY, 10, 'bold'))
     style.map("Treeview.Heading", background=[("active", BUTTON_SECONDARY_HOVER)])
     
-    tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=8)
+    # Set a fixed height to show ~8 rows within 1280x720 window
+    # This ensures rows are visible and fits within the window size
+    tree = ttk.Treeview(table_container, columns=columns, show="headings", height=8)
     
     for col in columns:
         tree.heading(col, text=col)
         if col == "View Product":
-            tree.column(col, anchor=tk.CENTER, width=130)
+            tree.column(col, anchor=tk.CENTER, width=130, minwidth=100)
         elif col == "Similarity":
-            tree.column(col, anchor=tk.CENTER, width=110)
+            tree.column(col, anchor=tk.CENTER, width=110, minwidth=80)
         elif col == "Product Name":
-            tree.column(col, anchor=tk.W, width=300)
+            tree.column(col, anchor=tk.W, width=300, minwidth=200)
         else:
-            tree.column(col, anchor=tk.W, width=150)
+            tree.column(col, anchor=tk.W, width=150, minwidth=100)
     
-    tree.pack(fill=tk.BOTH, expand=True)
+    # Use grid layout for better control over expansion
+    tree.grid(row=0, column=0, sticky="nsew")
     
-    scrollbar = ttk.Scrollbar(table_frame, orient=tk.VERTICAL, command=tree.yview)
+    # Configure grid weights for proper expansion
+    table_container.grid_rowconfigure(0, weight=1)
+    table_container.grid_columnconfigure(0, weight=1)
+    
+    # Create scrollbar
+    scrollbar = ttk.Scrollbar(table_container, orient=tk.VERTICAL, command=tree.yview)
     tree.configure(yscroll=scrollbar.set)
-    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+    scrollbar.grid(row=0, column=1, sticky="ns")
     
     return content_container, tree
 
@@ -383,10 +443,10 @@ def create_similar_section(parent: tk.Frame) -> ttk.Treeview:
         Similar products tree widget
     """
     similar_card = tk.Frame(parent, bg=BG_COLOR_CARD, relief=tk.FLAT, bd=0)
-    similar_card.pack(fill=tk.BOTH, expand=False, pady=(5, 15))
+    similar_card.pack(fill=tk.BOTH, expand=False, pady=(3, 10))
     
     similar_header = tk.Frame(similar_card, bg=BG_COLOR_CARD)
-    similar_header.pack(fill=tk.X, padx=20, pady=(10, 8))
+    similar_header.pack(fill=tk.X, padx=20, pady=(8, 6))
     
     tk.Label(
         similar_header,
@@ -397,91 +457,43 @@ def create_similar_section(parent: tk.Frame) -> ttk.Treeview:
     ).pack(side=tk.LEFT)
     
     similar_table_frame = tk.Frame(similar_card, bg=BG_COLOR_CARD)
-    similar_table_frame.pack(fill=tk.BOTH, expand=False, padx=20, pady=(0, 15))
+    similar_table_frame.pack(fill=tk.BOTH, expand=False, padx=20, pady=(0, 10))
+    
+    # Create container for similar tree with scrollbar
+    similar_table_container = tk.Frame(similar_table_frame, bg=BG_COLOR_CARD)
+    similar_table_container.pack(fill=tk.BOTH, expand=True)
     
     similar_columns = ("Product Name", "Brand", "Price", "Rating", "View")
+    # Set height for similar products to fit within 1280x720 window (shows ~4-5 rows)
+    # Reduced to ensure everything fits without cutting
     similar_tree = ttk.Treeview(
-        similar_table_frame, 
+        similar_table_container, 
         columns=similar_columns, 
-        show="headings", 
-        height=7
+        show="headings",
+        height=5
     )
     
     for col in similar_columns:
         similar_tree.heading(col, text=col)
         if col == "View":
-            similar_tree.column(col, anchor=tk.CENTER, width=100)
+            similar_tree.column(col, anchor=tk.CENTER, width=100, minwidth=80)
         else:
-            similar_tree.column(col, anchor=tk.W, width=180)
+            similar_tree.column(col, anchor=tk.W, width=180, minwidth=120)
     
-    similar_tree.pack(fill=tk.BOTH, expand=True)
+    # Use grid layout for better control
+    similar_tree.grid(row=0, column=0, sticky="nsew")
+    
+    # Configure grid weights
+    similar_table_container.grid_rowconfigure(0, weight=1)
+    similar_table_container.grid_columnconfigure(0, weight=1)
     
     similar_scrollbar = ttk.Scrollbar(
-        similar_table_frame, 
+        similar_table_container, 
         orient=tk.VERTICAL, 
         command=similar_tree.yview
     )
     similar_tree.configure(yscroll=similar_scrollbar.set)
-    similar_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+    similar_scrollbar.grid(row=0, column=1, sticky="ns")
     
     return similar_tree
-
-
-def create_export_button(parent: tk.Frame, export_callback) -> tk.Button:
-    """
-    Create export button for results.
-    
-    Args:
-        parent: Parent frame
-        export_callback: Callback function for export button
-        
-    Returns:
-        Export button widget
-    """
-    export_frame = tk.Frame(parent, bg=BG_COLOR_CARD)
-    export_frame.pack(fill=tk.X, padx=25, pady=(0, 15))
-    
-    export_button = tk.Button(
-        export_frame,
-        text="📥 Export to CSV/JSON",
-        command=export_callback,
-        font=(FONT_FAMILY, FONT_SIZE_NORMAL, 'bold'),
-        bg=BUTTON_SECONDARY,
-        fg=FG_COLOR_WHITE,
-        activebackground=BUTTON_SECONDARY_ACTIVE,
-        activeforeground=FG_COLOR_WHITE,
-        highlightbackground=BUTTON_SECONDARY,
-        highlightcolor=BUTTON_SECONDARY,
-        highlightthickness=0,
-        relief=tk.FLAT,
-        bd=0,
-        cursor='hand2',
-        state=tk.DISABLED,
-        padx=24,
-        pady=12
-    )
-    
-    # Force button color on macOS
-    try:
-        export_button.configure(bg=BUTTON_SECONDARY)
-    except:
-        pass
-    
-    def on_enter_export(e):
-        if export_button['state'] != 'disabled':
-            export_button.config(
-                bg=BUTTON_SECONDARY_HOVER, 
-                highlightbackground=BUTTON_SECONDARY_HOVER
-            )
-    def on_leave_export(e):
-        if export_button['state'] != 'disabled':
-            export_button.config(
-                bg=BUTTON_SECONDARY, 
-                highlightbackground=BUTTON_SECONDARY
-            )
-    export_button.bind("<Enter>", on_enter_export)
-    export_button.bind("<Leave>", on_leave_export)
-    export_button.pack(side=tk.RIGHT, padx=(0, 0))
-    
-    return export_button
 

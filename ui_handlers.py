@@ -6,13 +6,9 @@ This module contains event handler functions and business logic for the GUI.
 
 import logging
 import tkinter as tk
-from tkinter import messagebox, filedialog
-from typing import List, Dict, Optional, Callable
+from tkinter import messagebox
+from typing import List, Dict
 import webbrowser
-import json
-import csv
-from datetime import datetime
-import os
 
 from ui_constants import BUDGET_MAP
 
@@ -135,8 +131,7 @@ def perform_search(
     tree: tk.ttk.Treeview,
     similar_tree: tk.ttk.Treeview,
     engine,
-    use_advanced: bool,
-    update_export_button_state: Optional[Callable[[bool], None]] = None
+    use_advanced: bool
 ) -> List[Dict[str, str]]:
     """
     Perform product search and update the results table.
@@ -150,7 +145,6 @@ def perform_search(
         similar_tree: Similar products treeview widget
         engine: ProductRecommender instance
         use_advanced: Whether advanced features are enabled
-        update_export_button_state: Optional callback to update export button state
         
     Returns:
         List of current search results
@@ -238,8 +232,6 @@ def perform_search(
                 tree.insert("", tk.END, values=(name, brand_part, price, rating, view_text), tags=(url,))
         
         logger.info(f"Displayed {len(recommendations)} recommendations")
-        if update_export_button_state:
-            update_export_button_state(len(current_results) > 0)
         return current_results
         
     except Exception as e:
@@ -253,142 +245,4 @@ def perform_search(
                 tree.delete(item)
 
 
-def export_results(
-    current_results: List[Dict[str, str]],
-    use_advanced: bool,
-    root: tk.Tk
-) -> None:
-    """
-    Export current search results to CSV or JSON file.
-    
-    Args:
-        current_results: List of result dictionaries to export
-        use_advanced: Whether advanced features are enabled
-        root: Tkinter root window
-    """
-    if not current_results:
-        messagebox.showwarning(
-            "No Data to Export", 
-            "No search results available to export.\n\nPlease perform a search first."
-        )
-        return
-    
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    default_filename = f"product_recommendations_{timestamp}.csv"
-    
-    file_path = filedialog.asksaveasfilename(
-        defaultextension=".csv",
-        initialfile=default_filename,
-        filetypes=[
-            ("CSV files (Excel compatible)", "*.csv"),
-            ("JSON files", "*.json"),
-            ("All files", "*.*")
-        ],
-        title="Export Search Results",
-        confirmoverwrite=True
-    )
-    
-    if not file_path:
-        return
-    
-    try:
-        root.config(cursor="wait")
-        root.update()
-        
-        if file_path.endswith('.json'):
-            _export_json(file_path, current_results, use_advanced)
-            file_type = "JSON"
-        else:
-            _export_csv(file_path, current_results, use_advanced)
-            file_type = "CSV"
-        
-        file_name = os.path.basename(file_path)
-        file_dir = os.path.dirname(file_path)
-        
-        messagebox.showinfo(
-            "Export Successful",
-            f"✓ Successfully exported {len(current_results)} results!\n\n"
-            f"File: {file_name}\n"
-            f"Location: {file_dir}\n"
-            f"Format: {file_type}"
-        )
-        logger.info(f"Exported {len(current_results)} results to {file_path} ({file_type})")
-        
-    except PermissionError:
-        error_msg = (
-            "Permission denied!\n\n"
-            "The file may be open in another program.\n"
-            "Please close it and try again."
-        )
-        messagebox.showerror("Export Failed", error_msg)
-        logger.error(f"Permission denied when exporting to {file_path}")
-    except OSError as e:
-        error_msg = (
-            "File system error!\n\n"
-            f"Could not write to the selected location.\n"
-            f"Error: {str(e)}"
-        )
-        messagebox.showerror("Export Failed", error_msg)
-        logger.error(f"OS error when exporting: {e}", exc_info=True)
-    except Exception as e:
-        error_msg = (
-            "An unexpected error occurred!\n\n"
-            f"Error: {str(e)}\n\n"
-            "Please try again or contact support."
-        )
-        messagebox.showerror("Export Error", error_msg)
-        logger.error(f"Error exporting results: {e}", exc_info=True)
-    finally:
-        root.config(cursor="")
-        root.update()
-
-
-def _export_csv(file_path: str, current_results: List[Dict[str, str]], use_advanced: bool) -> None:
-    """Export results to CSV file."""
-    fieldnames = ['Product Name', 'Brand', 'Price', 'Rating', 'Product URL']
-    if use_advanced:
-        fieldnames.insert(4, 'Similarity Score')
-    
-    with open(file_path, 'w', newline='', encoding='utf-8-sig') as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        
-        for result in current_results:
-            row = {
-                'Product Name': str(result.get('name', 'N/A')).strip(),
-                'Brand': str(result.get('brand', 'N/A')).strip(),
-                'Price': str(result.get('price', 'N/A')).strip(),
-                'Rating': str(result.get('rating', 'N/A')).strip(),
-                'Product URL': str(result.get('url', 'N/A')).strip()
-            }
-            
-            if use_advanced and 'similarity_score' in result:
-                similarity = result.get('similarity_score', 'N/A')
-                if isinstance(similarity, (int, float)):
-                    row['Similarity Score'] = f"{similarity:.4f}"
-                else:
-                    row['Similarity Score'] = str(similarity)
-            
-            writer.writerow(row)
-
-
-def _export_json(file_path: str, current_results: List[Dict[str, str]], use_advanced: bool) -> None:
-    """Export results to JSON file."""
-    export_data = {
-        'export_info': {
-            'export_date': datetime.now().isoformat(),
-            'export_timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'application': 'AI-Powered Product Recommendation System',
-            'version': '1.0',
-            'total_results': len(current_results),
-            'features_enabled': {
-                'advanced_ai': use_advanced,
-                'generative_ai': use_advanced  # Simplified for now
-            }
-        },
-        'results': current_results
-    }
-    
-    with open(file_path, 'w', encoding='utf-8') as f:
-        json.dump(export_data, f, indent=2, ensure_ascii=False, sort_keys=False)
 

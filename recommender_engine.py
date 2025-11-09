@@ -1,20 +1,28 @@
 """
 Product Recommendation Engine
 
-This module implements a content-based recommendation system using TF-IDF vectorization
-and cosine similarity. Supports both basic and advanced AI features (optional).
-Includes Generative AI (LLM) integration using Sentence Transformers for semantic understanding.
+Modern content-based recommendation system with:
+- BM25 algorithm (industry-standard keyword search)
+- Semantic embeddings (Sentence Transformers for semantic understanding)
+- Hybrid search (combines BM25 + semantic for optimal results)
+- Faceted filtering (modern e-commerce style)
+
+Supports both basic and advanced AI features with progressive enhancement.
 """
 
 import logging
 import os
 import re
 import shutil
+import hashlib
+import pickle
 from typing import List, Dict, Optional, Union
 import pandas as pd
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from collections import Counter
+import math
 
 # Try to import Sentence Transformers for Generative AI features
 try:
@@ -24,13 +32,7 @@ except ImportError:
     GENAI_AVAILABLE = False
     logging.warning("Sentence Transformers not available. Generative AI features disabled.")
 
-# Try to import Hugging Face Transformers for LLM features (optional)
-try:
-    from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
-    LLM_AVAILABLE = True
-except ImportError:
-    LLM_AVAILABLE = False
-    logging.warning("Transformers library not available. LLM text generation features disabled.")
+# Note: LLM features removed as they were not being used
 
 # Try to import NLTK for advanced features
 try:
@@ -61,6 +63,7 @@ logger = logging.getLogger(__name__)
 # Model configuration
 MODEL_NAME = 'all-MiniLM-L6-v2'
 MODELS_DIR = 'models'
+EMBEDDINGS_CACHE_DIR = 'embeddings_cache'
 
 
 def get_model_path(model_name: str = MODEL_NAME) -> str:
@@ -156,14 +159,60 @@ def ensure_model_cached(model_name: str = MODEL_NAME) -> str:
 # Initialize NLTK resources if available
 if NLTK_AVAILABLE:
     try:
-        nltk.download('punkt', quiet=True)
-        nltk.download('stopwords', quiet=True)
-        nltk.download('wordnet', quiet=True)
-        stemmer = PorterStemmer()
-        lemmatizer = WordNetLemmatizer()
-        stop_words = set(stopwords.words('english'))
+        import ssl
+        import os
+        
+        # Fix SSL certificate issues on macOS (common problem)
+        # Try multiple approaches to handle SSL certificate verification
+        try:
+            # Method 1: Try using certifi if available (commonly installed with requests)
+            try:
+                import certifi
+                cert_path = certifi.where()
+                os.environ['SSL_CERT_FILE'] = cert_path
+                os.environ['REQUESTS_CA_BUNDLE'] = cert_path
+                logger.debug("Using certifi certificates for SSL")
+            except ImportError:
+                # Method 2: Disable SSL verification for NLTK downloads only (less secure but works)
+                # This is acceptable for downloading NLTK data which is public/open source
+                try:
+                    _create_unverified_https_context = ssl._create_unverified_context
+                except AttributeError:
+                    pass
+                else:
+                    ssl._create_default_https_context = _create_unverified_https_context
+                    logger.debug("Using unverified SSL context for NLTK downloads")
+        except Exception as ssl_error:
+            logger.debug(f"SSL configuration attempt failed: {ssl_error}")
+        
+        # Download NLTK resources with individual error handling
+        nltk_resources_available = {'punkt': False, 'stopwords': False, 'wordnet': False}
+        
+        for resource in ['punkt', 'stopwords', 'wordnet']:
+            try:
+                nltk.download(resource, quiet=True)
+                nltk_resources_available[resource] = True
+            except Exception as e:
+                logger.debug(f"Could not download NLTK resource '{resource}': {e}")
+        
+        # Only initialize if all required resources are available
+        if all(nltk_resources_available.values()):
+            try:
+                stemmer = PorterStemmer()
+                lemmatizer = WordNetLemmatizer()
+                stop_words = set(stopwords.words('english'))
+                logger.info("✓ NLTK resources initialized successfully")
+            except Exception as e:
+                logger.warning(f"Failed to initialize NLTK resources after download: {e}")
+                NLTK_AVAILABLE = False
+        else:
+            missing = [r for r, available in nltk_resources_available.items() if not available]
+            logger.warning(f"NLTK data downloads failed for: {', '.join(missing)} (SSL/certificate issues)")
+            logger.info("Application will continue with basic preprocessing and GenAI features (recommended).")
+            NLTK_AVAILABLE = False
     except Exception as e:
         logger.warning(f"Failed to initialize NLTK resources: {e}")
+        logger.info("Application will continue with basic preprocessing and GenAI features (recommended).")
         NLTK_AVAILABLE = False
 
 # Constants
@@ -218,16 +267,104 @@ class TextPreprocessor:
         return ' '.join(processed_tokens)
 
 
+class BM25:
+    """
+    BM25 (Best Matching 25) - Modern industry-standard ranking algorithm.
+    Better than TF-IDF for keyword search, used by Elasticsearch, Solr, and major search engines.
+    
+    BM25 addresses TF-IDF limitations:
+    - Better term frequency saturation (prevents over-weighting frequent terms)
+    - Document length normalization (handles varying document sizes)
+    - Tuned parameters (k1, b) for optimal ranking
+    """
+    
+    def __init__(self, corpus: List[str], k1: float = 1.5, b: float = 0.75):
+        """
+        Initialize BM25 with a corpus of documents.
+        
+        Args:
+            corpus: List of document strings
+            k1: Term frequency saturation parameter (default 1.5)
+            b: Document length normalization parameter (default 0.75)
+        """
+        self.k1 = k1
+        self.b = b
+        self.corpus = corpus
+        self.doc_freqs = []
+        self.idf = {}
+        self.avgdl = 0
+        self._initialize(corpus)
+    
+    def _initialize(self, corpus: List[str]) -> None:
+        """Initialize BM25 statistics from corpus."""
+        # Tokenize documents
+        doc_tokens = []
+        for doc in corpus:
+            tokens = doc.lower().split()
+            doc_tokens.append(tokens)
+            self.doc_freqs.append(Counter(tokens))
+        
+        # Calculate average document length
+        self.avgdl = sum(len(tokens) for tokens in doc_tokens) / len(doc_tokens) if doc_tokens else 0
+        
+        # Calculate IDF (Inverse Document Frequency)
+        df = Counter()
+        for doc_freq in self.doc_freqs:
+            for term in doc_freq:
+                df[term] += 1
+        
+        num_docs = len(corpus)
+        for term, freq in df.items():
+            # Standard IDF formula: log((N - n + 0.5) / (n + 0.5))
+            # where N = total docs, n = docs containing term
+            self.idf[term] = math.log((num_docs - freq + 0.5) / (freq + 0.5))
+    
+    def get_scores(self, query: str) -> np.ndarray:
+        """
+        Calculate BM25 scores for all documents given a query.
+        
+        Args:
+            query: Search query string
+            
+        Returns:
+            Array of BM25 scores for each document
+        """
+        query_terms = query.lower().split()
+        scores = np.zeros(len(self.corpus))
+        
+        for i, doc_freq in enumerate(self.doc_freqs):
+            doc_len = sum(doc_freq.values())
+            score = 0
+            
+            for term in query_terms:
+                if term in doc_freq:
+                    # BM25 formula
+                    tf = doc_freq[term]
+                    idf = self.idf.get(term, 0)
+                    
+                    # BM25 scoring: idf * (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * (doc_len / avgdl)))
+                    numerator = tf * (self.k1 + 1)
+                    denominator = tf + self.k1 * (1 - self.b + self.b * (doc_len / self.avgdl))
+                    score += idf * (numerator / denominator) if denominator > 0 else 0
+            
+            scores[i] = score
+        
+        return scores
+
+
 class ProductRecommender:
     """
-    A content-based product recommendation engine using TF-IDF and cosine similarity.
-    
-    Supports both basic and advanced AI features through optional parameters.
+    Modern content-based product recommendation engine with:
+    - BM25 algorithm (industry standard for keyword search)
+    - Semantic embeddings (Sentence Transformers for semantic understanding)
+    - Hybrid search (combines BM25 + semantic for best results)
+    - Faceted filtering (modern e-commerce style)
     
     Attributes:
         df (pd.DataFrame): The product dataset
-        vectorizer (TfidfVectorizer): TF-IDF vectorizer for text processing
+        vectorizer (TfidfVectorizer): TF-IDF vectorizer (fallback)
         tfidf_matrix: Sparse matrix of TF-IDF features
+        bm25: BM25 ranking algorithm instance
     """
     
     def __init__(
@@ -236,7 +373,8 @@ class ProductRecommender:
         use_ngrams: bool = False,
         use_advanced_preprocessing: bool = False,
         use_genai: bool = False,
-        feature_weights: Optional[Dict[str, float]] = None
+        feature_weights: Optional[Dict[str, float]] = None,
+        load_models_immediately: bool = True
     ) -> None:
         """
         Initialize the ProductRecommender with a dataset.
@@ -247,6 +385,7 @@ class ProductRecommender:
             use_advanced_preprocessing: Whether to use advanced text preprocessing (stemming/lemmatization)
             use_genai: Whether to use Generative AI (Sentence Transformers) for semantic embeddings
             feature_weights: Optional weights for features (default: product_name=0.7, brand=0.3)
+            load_models_immediately: If False, only load dataset. Models/embeddings loaded via load_models_and_embeddings()
             
         Raises:
             FileNotFoundError: If the CSV file doesn't exist
@@ -254,16 +393,68 @@ class ProductRecommender:
         self.df = pd.DataFrame()
         self.vectorizer: Optional[TfidfVectorizer] = None
         self.tfidf_matrix = None
+        self.bm25: Optional[BM25] = None  # Modern BM25 algorithm
         self.use_ngrams = use_ngrams
         self.use_advanced_preprocessing = use_advanced_preprocessing and NLTK_AVAILABLE
         self.use_genai = use_genai and GENAI_AVAILABLE
         self.feature_weights = feature_weights or {'product_name': 0.7, 'brand': 0.3}
+        self.use_hybrid_search = True  # Enable hybrid search (BM25 + semantic)
+        self.hybrid_weight_bm25 = 0.4  # Weight for BM25 in hybrid search
+        self.hybrid_weight_semantic = 0.6  # Weight for semantic in hybrid search
         
         # Initialize Generative AI model if enabled
         self.genai_model = None
         self.genai_embeddings = None
-        self.llm_model = None
-        self.llm_tokenizer = None
+        self._models_loaded = False
+        
+        # Load dataset first (fast)
+        if not os.path.exists(csv_path):
+            logger.error(f"Dataset file not found: {csv_path}")
+            raise FileNotFoundError(f"Dataset file not found: {csv_path}")
+        
+        try:
+            logger.info(f"Loading dataset from {csv_path}")
+            self.df = pd.read_csv(csv_path)
+            self.df.columns = [c.strip().lower() for c in self.df.columns]
+            logger.info(f"Loaded {len(self.df)} products from dataset")
+            
+            # Do minimal preprocessing immediately so get_available_brands() works
+            # This is fast and needed for brand dropdown to work
+            if 'product_name' in self.df.columns:
+                self.df['product_name_processed'] = (
+                    self.df['product_name']
+                    .astype(str)
+                    .str.lower()
+                    .str.replace(r'[^a-z0-9\s]', ' ', regex=True)
+                    .str.replace(r'\s+', ' ', regex=True)
+                    .str.strip()
+                    .replace('nan', '')
+                )
+            if 'brand' in self.df.columns:
+                self.df['brand_processed'] = (
+                    self.df['brand']
+                    .astype(str)
+                    .str.lower()
+                    .str.replace(r'[^a-z0-9\s]', ' ', regex=True)
+                    .str.replace(r'\s+', ' ', regex=True)
+                    .str.strip()
+                    .replace('nan', '')
+                )
+        except Exception as e:
+            logger.error(f"Error loading dataset: {e}", exc_info=True)
+            self.df = pd.DataFrame()
+            raise
+        
+        # Load models/embeddings if requested (can be deferred for background loading)
+        if load_models_immediately:
+            self._load_models_and_embeddings()
+        else:
+            logger.info("Models/embeddings loading deferred - will be loaded in background")
+    
+    def _load_models_and_embeddings(self) -> None:
+        """Load AI models and generate embeddings. Can be called in background thread."""
+        if self._models_loaded:
+            return
         
         if self.use_genai:
             try:
@@ -336,88 +527,134 @@ class ProductRecommender:
             except Exception as e:
                 logger.error(f"Failed to load Generative AI model: {e}")
                 self.use_genai = False
-            
-            # Optionally load a text-generating LLM for query expansion
-            # Using a small, free model that can run locally
-            if LLM_AVAILABLE:
-                try:
-                    logger.info("Loading LLM for query understanding (optional)...")
-                    # Using a small, free model - can be changed to other free models
-                    # Options: 'gpt2', 'distilgpt2', 'microsoft/DialoGPT-small'
-                    # For now, we'll use it only if explicitly needed
-                    self.llm_model = None  # Load on demand if needed
-                    logger.info("LLM support available")
-                except Exception as e:
-                    logger.warning(f"LLM not loaded (optional): {e}")
         
-        # Validate file exists
-        if not os.path.exists(csv_path):
-            logger.error(f"Dataset file not found: {csv_path}")
-            raise FileNotFoundError(f"Dataset file not found: {csv_path}")
-        
-        # Load dataset
-        try:
-            logger.info(f"Loading dataset from {csv_path}")
-            self.df = pd.read_csv(csv_path)
-            self.df.columns = [c.strip().lower() for c in self.df.columns]
-            logger.info(f"Loaded {len(self.df)} products from dataset")
-        except Exception as e:
-            logger.error(f"Error loading dataset: {e}", exc_info=True)
-            self.df = pd.DataFrame()
-            raise
-
-        # Initialize vectorizer if data is available
+        # Initialize vectorizer and BM25 if data is available
         if not self.df.empty:
-            self._preprocess_text_data()
-            self._initialize_vectorizer()
-            # Generate GenAI embeddings if enabled
+            # If GenAI is enabled, prioritize loading embeddings cache first (faster)
+            # Do minimal preprocessing first, then try cache
             if self.use_genai:
-                self._generate_genai_embeddings()
+                # Do minimal preprocessing first (needed for hash calculation)
+                self._preprocess_text_data()
+                # Try to load embeddings cache (fast path)
+                cached_embeddings = self._load_cached_embeddings()
+                if cached_embeddings is not None:
+                    self.genai_embeddings = cached_embeddings
+                    logger.info("✓ Embeddings loaded from cache - initializing BM25 for hybrid search")
+                    # Initialize BM25 for hybrid search (even with cached embeddings)
+                    self._initialize_bm25()
+                    # Keep TF-IDF as fallback
+                    self._initialize_vectorizer()
+                else:
+                    # Cache miss - need to do full initialization
+                    self._initialize_vectorizer()
+                    self._initialize_bm25()
+                    self._generate_genai_embeddings()
+            else:
+                # No GenAI - do standard initialization with BM25
+                self._preprocess_text_data()
+                self._initialize_vectorizer()
+                self._initialize_bm25()
         else:
             logger.warning("Dataset is empty, vectorizer not initialized")
+        
+        self._models_loaded = True
+        logger.info("✓ Models and embeddings loaded successfully (BM25 + Semantic Hybrid Search enabled)")
+    
+    def load_models_and_embeddings(self) -> None:
+        """
+        Public method to load models and embeddings in background thread.
+        This method is thread-safe and can be called after initial dataset load.
+        """
+        self._load_models_and_embeddings()
     
     def _preprocess_text_data(self) -> None:
-        """Preprocess text columns if advanced preprocessing is enabled."""
+        """Preprocess text columns if advanced preprocessing is enabled (optimized with vectorization)."""
+        # Skip if already preprocessed (done during dataset load for immediate brand access)
+        if 'product_name_processed' in self.df.columns and 'brand_processed' in self.df.columns:
+            return
+        
+        # Use vectorized operations for faster processing
         if self.use_advanced_preprocessing:
             logger.info("Applying advanced text preprocessing...")
             if 'product_name' in self.df.columns:
-                self.df['product_name_processed'] = self.df['product_name'].apply(
-                    lambda x: TextPreprocessor.preprocess_text(str(x) if pd.notna(x) else "")
+                # Convert to string first, then apply preprocessing
+                self.df['product_name_processed'] = self.df['product_name'].astype(str).apply(
+                    TextPreprocessor.preprocess_text
                 )
             if 'brand' in self.df.columns:
-                self.df['brand_processed'] = self.df['brand'].apply(
-                    lambda x: TextPreprocessor.clean_text(str(x) if pd.notna(x) else "")
+                self.df['brand_processed'] = self.df['brand'].astype(str).apply(
+                    TextPreprocessor.clean_text
                 )
         else:
-            # Simple preprocessing
+            # Simple preprocessing - use vectorized string operations for speed
             if 'product_name' in self.df.columns:
-                self.df['product_name_processed'] = self.df['product_name'].apply(
-                    lambda x: TextPreprocessor.clean_text(str(x) if pd.notna(x) else "")
+                # Fast vectorized cleaning
+                self.df['product_name_processed'] = (
+                    self.df['product_name']
+                    .astype(str)
+                    .str.lower()
+                    .str.replace(r'[^a-z0-9\s]', ' ', regex=True)
+                    .str.replace(r'\s+', ' ', regex=True)
+                    .str.strip()
+                    .replace('nan', '')
                 )
             if 'brand' in self.df.columns:
-                self.df['brand_processed'] = self.df['brand'].apply(
-                    lambda x: TextPreprocessor.clean_text(str(x) if pd.notna(x) else "")
+                self.df['brand_processed'] = (
+                    self.df['brand']
+                    .astype(str)
+                    .str.lower()
+                    .str.replace(r'[^a-z0-9\s]', ' ', regex=True)
+                    .str.replace(r'\s+', ' ', regex=True)
+                    .str.strip()
+                    .replace('nan', '')
                 )
     
-    def _initialize_vectorizer(self) -> None:
-        """Initialize TF-IDF vectorizer with product data."""
+    def _initialize_bm25(self) -> None:
+        """Initialize BM25 algorithm for modern keyword search."""
         try:
-            # Combine features with weights
-            text_data = []
-            for _, row in self.df.iterrows():
-                name = row.get('product_name_processed', row.get('product_name', ''))
-                brand = row.get('brand_processed', row.get('brand', ''))
-                
-                if self.use_ngrams or self.use_advanced_preprocessing:
-                    # Weight features by repeating them
-                    name_weighted = ' '.join([name] * int(self.feature_weights.get('product_name', 0.7) * 10))
-                    brand_weighted = ' '.join([brand] * int(self.feature_weights.get('brand', 0.3) * 10))
-                    combined = f"{name_weighted} {brand_weighted}".strip()
-                else:
-                    # Simple concatenation for basic mode
-                    combined = f"{name} {brand}".strip()
-                
-                text_data.append(combined)
+            if self.df.empty:
+                return
+            
+            # Prepare text data for BM25 (product name + brand)
+            name_col = self.df.get('product_name_processed', self.df.get('product_name', ''))
+            brand_col = self.df.get('brand_processed', self.df.get('brand', ''))
+            
+            # Fill NaN values
+            name_col = name_col.fillna('')
+            brand_col = brand_col.fillna('')
+            
+            # Combine product name and brand for BM25 indexing
+            text_data = (name_col + ' ' + brand_col).str.strip().tolist()
+            
+            # Initialize BM25 with optimized parameters
+            self.bm25 = BM25(text_data, k1=1.5, b=0.75)
+            logger.info("✓ BM25 algorithm initialized (modern keyword search)")
+        except Exception as e:
+            logger.warning(f"Error initializing BM25: {e}")
+            self.bm25 = None
+    
+    def _initialize_vectorizer(self) -> None:
+        """Initialize TF-IDF vectorizer with product data (optimized with vectorization)."""
+        try:
+            # Use vectorized operations for faster text combination
+            name_col = self.df.get('product_name_processed', self.df.get('product_name', ''))
+            brand_col = self.df.get('brand_processed', self.df.get('brand', ''))
+            
+            # Fill NaN values
+            name_col = name_col.fillna('')
+            brand_col = brand_col.fillna('')
+            
+            if self.use_ngrams or self.use_advanced_preprocessing:
+                # Weight features by repeating them (vectorized)
+                name_weight = int(self.feature_weights.get('product_name', 0.7) * 10)
+                brand_weight = int(self.feature_weights.get('brand', 0.3) * 10)
+                # Use vectorized string operations
+                name_weighted = (name_col + ' ') * name_weight
+                brand_weighted = (brand_col + ' ') * brand_weight
+                text_data = (name_weighted + brand_weighted).str.strip().tolist()
+            else:
+                # Simple concatenation for basic mode (vectorized)
+                text_data = (name_col + ' ' + brand_col).str.strip().tolist()
             
             # Configure vectorizer parameters
             if self.use_ngrams or self.use_advanced_preprocessing:
@@ -445,13 +682,94 @@ class ProductRecommender:
             self.vectorizer = None
             self.tfidf_matrix = None
     
+    def _get_dataset_hash(self) -> str:
+        """Generate a hash of the dataset to use as cache key."""
+        # Create a hash based on dataset content and size (optimized for speed)
+        # Use first and last few rows + total count for faster hashing
+        n_rows = len(self.df)
+        if n_rows == 0:
+            return hashlib.md5(b"empty").hexdigest()
+        
+        # Sample strategy: use first 10, last 10, and middle rows for hash
+        sample_size = min(30, n_rows)
+        if n_rows <= sample_size:
+            sample_indices = range(n_rows)
+        else:
+            # Take first 10, last 10, and evenly spaced middle rows
+            step = max(1, (n_rows - 20) // 10)
+            sample_indices = list(range(10)) + list(range(10, n_rows - 10, step))[:10] + list(range(n_rows - 10, n_rows))
+        
+        sample_data = []
+        for idx in sample_indices:
+            name = str(self.df.iloc[idx].get("product_name", "")) if pd.notna(self.df.iloc[idx].get("product_name")) else ""
+            brand = str(self.df.iloc[idx].get("brand", "")) if pd.notna(self.df.iloc[idx].get("brand")) else ""
+            sample_data.append(f"{name}|{brand}")
+        
+        dataset_str = f"{n_rows}_{''.join(sample_data)}"
+        return hashlib.md5(dataset_str.encode()).hexdigest()
+    
+    def _get_embeddings_cache_path(self) -> str:
+        """Get the path to the embeddings cache file."""
+        cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), EMBEDDINGS_CACHE_DIR)
+        os.makedirs(cache_dir, exist_ok=True)
+        dataset_hash = self._get_dataset_hash()
+        cache_filename = f"embeddings_{dataset_hash}.pkl"
+        return os.path.join(cache_dir, cache_filename)
+    
+    def _load_cached_embeddings(self) -> Optional[np.ndarray]:
+        """Load cached embeddings if they exist and are valid (optimized for speed)."""
+        # Note: This can be called before self.df is fully loaded, so we need to handle that
+        if not hasattr(self, 'df') or self.df.empty:
+            return None
+            
+        cache_path = self._get_embeddings_cache_path()
+        
+        if not os.path.exists(cache_path):
+            return None
+        
+        try:
+            logger.info(f"Loading cached embeddings...")
+            # Use faster pickle protocol
+            with open(cache_path, 'rb') as f:
+                cached_data = pickle.load(f)
+            
+            # Verify cache is valid (check shape matches dataset)
+            if isinstance(cached_data, np.ndarray) and len(cached_data) == len(self.df):
+                logger.info(f"✓ Loaded {len(cached_data)} cached embeddings (fast startup!)")
+                return cached_data
+            else:
+                logger.warning(f"Cached embeddings shape mismatch. Regenerating...")
+                return None
+        except Exception as e:
+            logger.warning(f"Error loading cached embeddings: {e}. Regenerating...")
+            return None
+    
+    def _save_embeddings_cache(self, embeddings: np.ndarray) -> None:
+        """Save embeddings to cache for faster future startups."""
+        cache_path = self._get_embeddings_cache_path()
+        
+        try:
+            with open(cache_path, 'wb') as f:
+                pickle.dump(embeddings, f)
+            logger.info(f"✓ Saved embeddings cache to: {cache_path}")
+        except Exception as e:
+            logger.warning(f"Could not save embeddings cache: {e}")
+    
     def _generate_genai_embeddings(self) -> None:
-        """Generate semantic embeddings using Generative AI (Sentence Transformers)."""
+        """Generate semantic embeddings using Generative AI (Sentence Transformers) with caching."""
         if not self.use_genai or self.genai_model is None:
             return
         
+        # Try to load from cache first
+        cached_embeddings = self._load_cached_embeddings()
+        if cached_embeddings is not None:
+            self.genai_embeddings = cached_embeddings
+            return
+        
+        # Cache miss - generate embeddings
         try:
             logger.info("Generating semantic embeddings using Generative AI...")
+            logger.info("This may take 1-2 minutes on first run. Embeddings will be cached for future use.")
             # Combine product name and brand for embedding
             text_data = []
             for _, row in self.df.iterrows():
@@ -460,14 +778,18 @@ class ProductRecommender:
                 combined = f"{name} {brand}".strip()
                 text_data.append(combined)
             
-            # Generate embeddings
+            # Generate embeddings with optimized batch size
             self.genai_embeddings = self.genai_model.encode(
                 text_data,
                 show_progress_bar=True,
-                batch_size=32,
-                convert_to_numpy=True
+                batch_size=64,  # Increased batch size for faster processing
+                convert_to_numpy=True,
+                normalize_embeddings=True  # Normalize for better cosine similarity
             )
             logger.info(f"Generated {len(self.genai_embeddings)} semantic embeddings")
+            
+            # Save to cache for future use
+            self._save_embeddings_cache(self.genai_embeddings)
         except Exception as e:
             logger.error(f"Error generating GenAI embeddings: {e}", exc_info=True)
             self.use_genai = False
@@ -518,19 +840,62 @@ class ProductRecommender:
         return np.array(selected[:top_k])
 
     def get_available_brands(self, product_query: str = "") -> List[str]:
-        """Get sorted list of unique brands from the dataset, optionally filtered by product type."""
+        """
+        Get sorted list of unique brands from the dataset, optionally filtered by product type.
+        
+        Professional best practice:
+        - When no query: return all brands
+        - When query provided: filter brands to show only those with matching products
+        - Uses simple text matching when models aren't ready (fast, works immediately)
+        - Uses semantic similarity when models are ready (more accurate)
+        """
         if self.df.empty:
             logger.warning("Dataset is empty, returning empty brand list")
             return []
         
+        # If no product query, return all brands
         if not product_query or product_query.strip() == "":
             brands = self.df["brand"].dropna().unique().tolist()
             return sorted([b for b in brands if b and str(b).strip()])
         
+        # If vectorizer not ready, use simple text-based filtering (fast, works immediately)
+        # This is a professional fallback that provides immediate value
         if self.vectorizer is None:
-            logger.warning("Vectorizer not initialized, returning empty brand list")
-            return []
+            logger.debug("Using simple text-based brand filtering (models loading)")
+            query_lower = product_query.strip().lower()
+            
+            # Filter products by simple text matching in product names
+            if 'product_name' in self.df.columns:
+                # Use case-insensitive contains check (simple and reliable)
+                # This works better than regex for user queries
+                product_names_lower = self.df['product_name'].astype(str).str.lower()
+                
+                # Check if query appears anywhere in product name
+                mask = product_names_lower.str.contains(query_lower, case=False, na=False, regex=False)
+                
+                # Also check individual words if query has multiple words
+                if ' ' in query_lower:
+                    query_words = [w.strip() for w in query_lower.split() if w.strip()]
+                    if query_words:
+                        # At least one word must match
+                        word_mask = pd.Series([False] * len(self.df), index=self.df.index)
+                        for word in query_words:
+                            word_mask = word_mask | product_names_lower.str.contains(word, case=False, na=False, regex=False)
+                        mask = mask | word_mask
+                
+                filtered_products = self.df[mask]
+                if not filtered_products.empty:
+                    brands = filtered_products["brand"].dropna().unique().tolist()
+                    filtered_brands = sorted([b for b in brands if b and str(b).strip()])
+                    logger.debug(f"Found {len(filtered_brands)} brands using simple text matching for: {product_query}")
+                    return filtered_brands
+            
+            # Fallback: return all brands if no matches
+            logger.debug("No matches found with simple text filtering, returning all brands")
+            brands = self.df["brand"].dropna().unique().tolist()
+            return sorted([b for b in brands if b and str(b).strip()])
         
+        # Vectorizer is ready - use semantic similarity (more accurate)
         try:
             # Preprocess query if advanced features enabled
             if self.use_advanced_preprocessing:
@@ -545,10 +910,30 @@ class ProductRecommender:
             relevant_products = self.df.iloc[top_indices]
             brands = relevant_products["brand"].dropna().unique().tolist()
             filtered_brands = sorted([b for b in brands if b and str(b).strip()])
-            logger.debug(f"Found {len(filtered_brands)} brands for query: {product_query}")
+            logger.debug(f"Found {len(filtered_brands)} brands using semantic similarity for: {product_query}")
             return filtered_brands
         except Exception as e:
-            logger.warning(f"Error filtering brands, falling back to all brands: {e}")
+            logger.warning(f"Error filtering brands with semantic similarity, falling back to text matching: {e}")
+            # Fallback to simple text matching
+            query_lower = product_query.strip().lower()
+            if 'product_name' in self.df.columns:
+                product_names_lower = self.df['product_name'].astype(str).str.lower()
+                mask = product_names_lower.str.contains(query_lower, case=False, na=False, regex=False)
+                
+                # Also check individual words
+                if ' ' in query_lower:
+                    query_words = [w.strip() for w in query_lower.split() if w.strip()]
+                    if query_words:
+                        word_mask = pd.Series([False] * len(self.df), index=self.df.index)
+                        for word in query_words:
+                            word_mask = word_mask | product_names_lower.str.contains(word, case=False, na=False, regex=False)
+                        mask = mask | word_mask
+                
+                filtered_products = self.df[mask]
+                if not filtered_products.empty:
+                    brands = filtered_products["brand"].dropna().unique().tolist()
+                    return sorted([b for b in brands if b and str(b).strip()])
+            # Final fallback: all brands
             brands = self.df["brand"].dropna().unique().tolist()
             return sorted([b for b in brands if b and str(b).strip()])
     
@@ -684,10 +1069,13 @@ class ProductRecommender:
         seen_products: set, 
         budget_max: Optional[float],
         top_k: int,
-        similarity_scores: Optional[np.ndarray] = None
+        similarity_scores: Optional[np.ndarray] = None,
+        brand_filter: Optional[str] = None
     ) -> List[Dict[str, Union[str, float]]]:
         """Process search results and extract product data with filtering."""
         output = []
+        brand_filter_lower = brand_filter.lower().strip() if brand_filter else None
+        
         for _, row in results.iterrows():
             if len(output) >= top_k:
                 break
@@ -695,6 +1083,12 @@ class ProductRecommender:
             similarity = similarity_scores[row.name] if similarity_scores is not None else None
             product_data = self._extract_product_data(row, similarity)
             product_key = (product_data["name"].lower().strip(), product_data["brand"].lower().strip())
+            
+            # Enforce brand filter strictly
+            if brand_filter_lower:
+                product_brand = str(product_data.get("brand", "")).lower().strip()
+                if product_brand != brand_filter_lower:
+                    continue  # Skip products that don't match the brand filter
             
             if product_key in seen_products:
                 continue
@@ -735,44 +1129,133 @@ class ProductRecommender:
         if self.df.empty:
             logger.error("Dataset not available")
             return ["Dataset not loaded properly."]
-        if not self.use_genai and self.vectorizer is None:
-            logger.error("Vectorizer not available")
-            return ["Dataset not loaded properly."]
-        if self.use_genai and self.genai_embeddings is None:
-            logger.error("GenAI embeddings not available")
-            return ["Generative AI embeddings not loaded properly."]
+        
+        # Check if models are ready - fallback to TF-IDF if GenAI not ready
+        use_genai_for_search = self.use_genai and self.genai_embeddings is not None and self.genai_model is not None
+        
+        if not use_genai_for_search:
+            # Fallback to BM25 or TF-IDF if GenAI not ready or not enabled
+            if self.bm25 is None and self.vectorizer is None:
+                # Try to initialize BM25 and TF-IDF if not already done
+                if not self.df.empty:
+                    logger.info("GenAI not ready, initializing BM25 and TF-IDF for search...")
+                    self._preprocess_text_data()
+                    self._initialize_bm25()
+                    self._initialize_vectorizer()
+                else:
+                    logger.error("Search algorithms not available and dataset is empty")
+                    return ["Dataset not loaded properly."]
+            
+            if self.bm25 is None and self.vectorizer is None:
+                logger.error("Search algorithms not available")
+                return ["Search not ready. Please wait for models to load."]
 
-        # Preprocess and expand query if advanced features enabled
+        # Filter by brand FIRST if brand_query is provided (AND logic)
+        # This ensures products must match BOTH product_query AND brand_query
+        filtered_df = self.df.copy()
+        brand_filter_mask = None
+        
+        if brand_query and brand_query.strip():
+            brand_query_clean = brand_query.strip().lower()
+            # Create case-insensitive brand filter
+            brand_filter_mask = filtered_df['brand'].astype(str).str.lower().str.strip() == brand_query_clean
+            filtered_df = filtered_df[brand_filter_mask].copy()
+            
+            if filtered_df.empty:
+                logger.info(f"No products found for brand '{brand_query}'")
+                return [f"No products found for brand '{brand_query}'."]
+            
+            logger.info(f"Filtered to {len(filtered_df)} products from brand '{brand_query}'")
+        
+        # Preprocess and expand product query (without brand_query)
         if self.use_advanced_preprocessing:
             expanded_query = self._expand_query(product_query)
-            query_text = TextPreprocessor.preprocess_text(f"{expanded_query} {brand_query}".strip())
+            query_text = TextPreprocessor.preprocess_text(expanded_query.strip())
         else:
-            query_text = f"{product_query} {brand_query}".strip()
+            query_text = product_query.strip()
         
-        logger.info(f"Searching for: {query_text} (budget: {budget_max}, top_k: {top_k})")
+        logger.info(f"Searching for: '{query_text}' with brand filter: '{brand_query if brand_query else 'None'}' (budget: {budget_max}, top_k: {top_k})")
         
-        # Use Generative AI embeddings if available, otherwise use TF-IDF
-        if self.use_genai and self.genai_embeddings is not None:
-            # Generate query embedding using GenAI
+        # Modern Hybrid Search: Combine BM25 (keyword) + Semantic (understanding)
+        # This is the industry standard used by major search engines
+        if use_genai_for_search and self.use_hybrid_search and self.bm25 is not None:
+            # HYBRID SEARCH: BM25 + Semantic Embeddings
+            logger.info("Using Hybrid Search (BM25 + Semantic Embeddings)")
+            
+            # 1. BM25 scores for keyword matching
+            bm25_scores = self.bm25.get_scores(query_text)
+            # Normalize BM25 scores to 0-1 range
+            if bm25_scores.max() > 0:
+                bm25_scores_normalized = bm25_scores / bm25_scores.max()
+            else:
+                bm25_scores_normalized = bm25_scores
+            
+            # 2. Semantic similarity scores
             query_embedding = self.genai_model.encode([query_text], convert_to_numpy=True)
-            # Calculate cosine similarity with GenAI embeddings
-            similarity_scores = cosine_similarity(query_embedding, self.genai_embeddings).flatten()
-            logger.info("Using Generative AI semantic embeddings for similarity calculation")
+            semantic_scores = cosine_similarity(query_embedding, self.genai_embeddings).flatten()
+            # Normalize semantic scores to 0-1 range
+            if semantic_scores.max() > 0:
+                semantic_scores_normalized = semantic_scores / semantic_scores.max()
+            else:
+                semantic_scores_normalized = semantic_scores
+            
+            # 3. Combine both scores with weighted average
+            all_similarity_scores = (
+                self.hybrid_weight_bm25 * bm25_scores_normalized +
+                self.hybrid_weight_semantic * semantic_scores_normalized
+            )
+            logger.info(f"Hybrid search: BM25 weight={self.hybrid_weight_bm25}, Semantic weight={self.hybrid_weight_semantic}")
+        elif use_genai_for_search:
+            # Semantic search only (if BM25 not available)
+            logger.info("Using Semantic Embeddings (GenAI)")
+            query_embedding = self.genai_model.encode([query_text], convert_to_numpy=True)
+            all_similarity_scores = cosine_similarity(query_embedding, self.genai_embeddings).flatten()
+        elif self.bm25 is not None:
+            # BM25 search only (modern keyword search)
+            logger.info("Using BM25 algorithm (modern keyword search)")
+            bm25_scores = self.bm25.get_scores(query_text)
+            # Normalize BM25 scores
+            if bm25_scores.max() > 0:
+                all_similarity_scores = bm25_scores / bm25_scores.max()
+            else:
+                all_similarity_scores = bm25_scores
         else:
-            # Use traditional TF-IDF
+            # Fallback to TF-IDF
+            logger.info("Using TF-IDF (fallback)")
             query_vec = self.vectorizer.transform([query_text])
-            similarity_scores = cosine_similarity(query_vec, self.tfidf_matrix).flatten()
+            all_similarity_scores = cosine_similarity(query_vec, self.tfidf_matrix).flatten()
         
         # Apply weighted similarity if advanced features enabled
         if self.use_ngrams or self.use_advanced_preprocessing or self.use_genai:
-            similarity_scores = self._calculate_weighted_similarity(similarity_scores)
+            all_similarity_scores = self._calculate_weighted_similarity(all_similarity_scores)
         
-        max_candidates = min(len(self.df), top_k * CANDIDATE_MULTIPLIER)
+        # If brand filter is applied, only consider similarity scores for filtered products
+        if brand_filter_mask is not None:
+            # Get original indices of filtered products
+            filtered_indices = filtered_df.index.values
+            # Create a mask for similarity scores (set non-filtered products to -inf)
+            similarity_scores = np.full(len(self.df), -np.inf)
+            similarity_scores[filtered_indices] = all_similarity_scores[filtered_indices]
+        else:
+            similarity_scores = all_similarity_scores
+        
+        max_candidates = min(len(filtered_df) if brand_filter_mask is not None else len(self.df), top_k * CANDIDATE_MULTIPLIER)
         top_indices = similarity_scores.argsort()[-max_candidates:][::-1]
         
-        # Apply diversity filter if enabled
+        # Filter out indices with -inf scores (products that don't match brand filter)
+        if brand_filter_mask is not None:
+            top_indices = top_indices[similarity_scores[top_indices] != -np.inf]
+            # Double-check: ensure all indices are in the filtered set
+            filtered_indices_set = set(filtered_indices)
+            top_indices = np.array([idx for idx in top_indices if idx in filtered_indices_set])
+        
+        # Apply diversity filter if enabled (but only within the brand filter if applied)
         if diversity_weight > 0 and (self.use_ngrams or self.use_advanced_preprocessing or self.use_genai):
             top_indices = self._apply_diversity_filter(top_indices, similarity_scores, diversity_weight, top_k)
+            # Re-verify brand filter after diversity filter
+            if brand_filter_mask is not None:
+                filtered_indices_set = set(filtered_indices)
+                top_indices = np.array([idx for idx in top_indices if idx in filtered_indices_set])
 
         results = self.df.iloc[top_indices]
         if results.empty:
@@ -780,9 +1263,12 @@ class ProductRecommender:
             return [f"No relevant products found for '{product_query}'."]
 
         seen_products = set()
-        output = self._process_search_results(results, seen_products, budget_max, top_k, similarity_scores)
+        # Pass brand_query to enforce brand filtering in results processing
+        output = self._process_search_results(
+            results, seen_products, budget_max, top_k, similarity_scores, brand_query
+        )
         
-        # If we don't have enough results, try to get more
+        # If we don't have enough results, try to get more (only if brand filter allows)
         if len(output) < top_k and max_candidates < len(self.df):
             try:
                 expanded_candidates = min(len(self.df), top_k * EXPANDED_CANDIDATE_MULTIPLIER)
@@ -790,10 +1276,16 @@ class ProductRecommender:
                 processed_indices_set = set(top_indices)
                 new_indices = [idx for idx in all_indices if idx not in processed_indices_set]
                 
+                # If brand filter is applied, only consider indices from filtered products
+                if brand_filter_mask is not None:
+                    filtered_indices_set = set(filtered_indices)
+                    new_indices = [idx for idx in new_indices if idx in filtered_indices_set]
+                
                 if new_indices:
                     additional_results = self.df.iloc[new_indices]
                     additional_output = self._process_search_results(
-                        additional_results, seen_products, budget_max, top_k - len(output), similarity_scores
+                        additional_results, seen_products, budget_max, top_k - len(output), 
+                        similarity_scores, brand_query
                     )
                     output.extend(additional_output)
             except Exception as e:

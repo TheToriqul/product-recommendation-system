@@ -11,10 +11,6 @@ from typing import Optional
 DEFAULT_CONFIG = {
     'csv_path': 'home appliance skus lowes.csv',
     'log_level': 'INFO',
-    'default_top_k': 10,
-    'similar_top_k': 8,
-    'window_width': 1000,
-    'window_height': 700,
 }
 
 
