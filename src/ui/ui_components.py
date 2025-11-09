@@ -6,6 +6,7 @@ results section, and similar products section.
 """
 
 import logging
+import sys
 import tkinter as tk
 from tkinter import ttk
 from typing import Optional
@@ -589,10 +590,57 @@ def create_evaluation_tab(parent: tk.Frame) -> tuple:
     canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
     scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
     
-    # Mouse wheel scrolling
+    # Mouse wheel scrolling - cross-platform support
     def on_mousewheel(event):
-        canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        """Handle mouse wheel scrolling for all platforms."""
+        # Check if event has delta (Windows/MacOS) or num (Linux)
+        if hasattr(event, 'delta'):
+            # Windows and MacOS
+            if sys.platform == 'darwin':  # macOS
+                canvas.yview_scroll(int(-1 * event.delta), "units")
+            else:  # Windows
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        elif hasattr(event, 'num'):
+            # Linux
+            if event.num == 4:
+                canvas.yview_scroll(-1, "units")
+            elif event.num == 5:
+                canvas.yview_scroll(1, "units")
     
-    canvas.bind_all("<MouseWheel>", on_mousewheel)
+    def on_enter_canvas(event):
+        """When mouse enters canvas area, bind mouse wheel."""
+        if sys.platform == 'win32':
+            canvas.bind_all("<MouseWheel>", on_mousewheel)
+        else:
+            # macOS and Linux
+            canvas.bind_all("<Button-4>", on_mousewheel)
+            canvas.bind_all("<Button-5>", on_mousewheel)
+            if sys.platform == 'darwin':
+                # macOS also supports MouseWheel
+                canvas.bind_all("<MouseWheel>", on_mousewheel)
+    
+    def on_leave_canvas(event):
+        """When mouse leaves canvas area, unbind mouse wheel."""
+        if sys.platform == 'win32':
+            canvas.unbind_all("<MouseWheel>")
+        else:
+            canvas.unbind_all("<Button-4>")
+            canvas.unbind_all("<Button-5>")
+            if sys.platform == 'darwin':
+                canvas.unbind_all("<MouseWheel>")
+    
+    # Bind enter/leave events to canvas and scrollable frame
+    canvas.bind("<Enter>", on_enter_canvas)
+    canvas.bind("<Leave>", on_leave_canvas)
+    scrollable_frame.bind("<Enter>", on_enter_canvas)
+    scrollable_frame.bind("<Leave>", on_leave_canvas)
+    
+    # Also bind directly to canvas for immediate response
+    canvas.bind("<MouseWheel>", on_mousewheel)
+    canvas.bind("<Button-4>", on_mousewheel)
+    canvas.bind("<Button-5>", on_mousewheel)
+    scrollable_frame.bind("<MouseWheel>", on_mousewheel)
+    scrollable_frame.bind("<Button-4>", on_mousewheel)
+    scrollable_frame.bind("<Button-5>", on_mousewheel)
     
     return canvas, buttons_frame, status_label, scrollable_frame
