@@ -16,6 +16,9 @@ import sys
 from typing import Optional, Dict, Any
 import tkinter as tk
 
+# Get the Python executable path (cross-platform)
+PYTHON_EXECUTABLE = sys.executable
+
 logger = logging.getLogger(__name__)
 
 
@@ -1052,8 +1055,9 @@ def run_quick_evaluation(callback=None):
             logger.debug(f"PYTHONPATH set to: {env['PYTHONPATH']}")
             
             # Run evaluation script from project root as a module
+            # Use sys.executable for cross-platform compatibility (works on Windows, macOS, Linux)
             result = subprocess.run(
-                ["python3", "-m", "src.evaluation.run_evaluation", 
+                [PYTHON_EXECUTABLE, "-m", "src.evaluation.run_evaluation", 
                  "--quick", 
                  "--csv-path", "data/home appliance skus lowes.csv",
                  "--output-dir", "evaluation_results"],
