@@ -6,32 +6,33 @@ This document outlines how the project meets all professor requirements.
 
 ### ✅ Data Preprocessing and Feature Engineering
 
-- **Implemented**: `TextPreprocessor` class in `recommender_engine.py`
+- **Implemented**: `TextPreprocessor` class in `src/core/recommender_engine.py`
 - **Features**:
   - Text cleaning and normalization
-  - Advanced preprocessing (stemming, lemmatization) via NLTK
+  - Advanced preprocessing (stemming, lemmatization) via NLTK (optional)
   - Feature extraction from product names and brands
   - TF-IDF vectorization
-  - Semantic embeddings (Sentence Transformers)
+  - BM25 indexing for keyword search
+  - Semantic embeddings (Sentence Transformers - Generative AI)
 
 ### ✅ User-Item Interaction Matrix Creation
 
 - **Status**: Not Applicable for Content-Based Filtering
-- **Explanation**: User-item interaction matrices are used in collaborative filtering approaches. This project uses content-based filtering, which relies on item features rather than user interactions. The system uses item feature vectors (TF-IDF, embeddings) instead.
+- **Explanation**: User-item interaction matrices are used in collaborative filtering approaches. This project uses content-based filtering, which relies on item features rather than user interactions. The system uses item feature vectors (TF-IDF, BM25, semantic embeddings) instead.
 
 ### ✅ Model Training and Parameter Tuning
 
-- **Implemented**: `parameter_tuning.py`
+- **Implemented**: `src/evaluation/parameter_tuning.py`
 - **Features**:
   - BM25 parameter tuning (k1, b)
   - Hybrid weight tuning (BM25 vs Semantic)
   - Feature weight tuning (product_name vs brand)
   - Best parameter finding based on evaluation metrics
-- **Demonstration**: Run `run_evaluation.py` (full mode) to see parameter tuning results
+- **Demonstration**: Run `src/evaluation/run_evaluation.py` (full mode) to see parameter tuning results
 
 ### ✅ Recommendation Generation and Filtering
 
-- **Implemented**: `recommend()` method in `recommender_engine.py`
+- **Implemented**: `recommend()` method in `src/core/recommender_engine.py`
 - **Features**:
   - Product query search
   - Brand filtering
@@ -39,15 +40,17 @@ This document outlines how the project meets all professor requirements.
   - Multiple sorting options
   - Diversity filtering
   - Top-K recommendations
+  - Hybrid search (BM25 + Semantic)
 
 ### ✅ Evaluation Methodologies
 
-- **Implemented**: `evaluation_metrics.py`, `run_evaluation.py`
+- **Implemented**: `src/evaluation/` directory with comprehensive evaluation modules
 - **Features**:
   - Comprehensive evaluation framework
   - Multiple evaluation metrics
   - Baseline comparisons
   - Statistical analysis
+  - GUI integration
 
 ---
 
@@ -57,8 +60,8 @@ This document outlines how the project meets all professor requirements.
 
 #### Precision@K, Recall@K, NDCG, MAP
 
-- **Implemented**: `evaluation_metrics.py`
-- **Usage**: Calculated in `run_evaluation.py` and displayed in GUI
+- **Implemented**: `src/evaluation/evaluation_metrics.py`
+- **Usage**: Calculated in `src/evaluation/run_evaluation.py` and displayed in GUI
 - **Results**: Available in evaluation reports and GUI Evaluation tab
 
 #### RMSE and MAE
@@ -72,7 +75,7 @@ This document outlines how the project meets all professor requirements.
 
 ### ✅ A/B Testing Results or User Satisfaction Metrics
 
-- **Implemented**: `ab_testing.py`
+- **Implemented**: `src/evaluation/ab_testing.py`
 - **Features**:
   - Control and treatment group assignment
   - User satisfaction simulation (CTR, ratings, engagement)
@@ -81,7 +84,7 @@ This document outlines how the project meets all professor requirements.
 
 ### ✅ Diversity, Novelty, and Coverage Analysis
 
-- **Implemented**: `diversity_metrics.py`
+- **Implemented**: `src/evaluation/diversity_metrics.py`
 - **Metrics**:
   - **Diversity**: Intra-list diversity (ILD), category diversity, brand diversity
   - **Novelty**: Measures recommendation unexpectedness based on item popularity
@@ -90,7 +93,7 @@ This document outlines how the project meets all professor requirements.
 
 ### ✅ Cold Start Problem Handling
 
-- **Implemented**: `cold_start.py`
+- **Implemented**: `src/evaluation/cold_start.py`
 - **Features**:
   - New user cold start strategies (content-based, popular items fallback)
   - New item cold start strategies (similarity-based)
@@ -100,7 +103,7 @@ This document outlines how the project meets all professor requirements.
 
 ### ✅ Scalability and Computational Efficiency
 
-- **Implemented**: `scalability_efficiency.py`
+- **Implemented**: `src/evaluation/scalability_efficiency.py`
 - **Measurements**:
   - Query response time (mean, median, min, max, std)
   - Memory usage (RSS, VMS, percentage)
@@ -111,7 +114,7 @@ This document outlines how the project meets all professor requirements.
 
 ### ✅ Comparison with Baseline Recommendation Methods
 
-- **Implemented**: `baseline_comparison.py`
+- **Implemented**: `src/evaluation/baseline_comparison.py`
 - **Baselines Compared**:
   1. **Random Baseline**: Random product recommendations
   2. **TF-IDF Only**: Content-based using only TF-IDF

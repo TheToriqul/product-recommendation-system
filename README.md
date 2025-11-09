@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-black.svg)](https://github.com/TheToriqul/product-recommendation-system)
 
-A content-based recommendation system that suggests electrical appliances using Artificial Intelligence (AI) and data-driven insights. This project leverages machine learning techniques to analyze appliance features and recommend similar or relevant products based on user preferences.
+A modern content-based recommendation system that suggests electrical appliances using **Hybrid Search** (BM25 + Semantic Embeddings) and **Generative AI**. This project leverages advanced machine learning techniques including BM25 keyword search, Sentence Transformers for semantic understanding, and GPT-2 for conversational AI.
 
 ## 👥 Project Team Members
 
@@ -18,24 +18,30 @@ A content-based recommendation system that suggests electrical appliances using 
 
 ## 🧠 Project Overview
 
-This repository contains the implementation of an **AI-driven Product Recommendation System** specifically designed for **electrical appliances**. The system leverages **Content-Based Filtering** techniques enhanced by **Artificial Intelligence (AI)** and **Generative AI (LLM)** to provide personalized recommendations based on product features and user preferences.
+This repository contains the implementation of an **AI-driven Product Recommendation System** specifically designed for **electrical appliances**. The system leverages **Content-Based Filtering** enhanced with **Hybrid Search** (combining BM25 keyword matching and semantic embeddings) and **Generative AI** to provide personalized recommendations.
 
-**Key Innovation**: This project implements **Generative AI** using **Sentence Transformers (BERT-based models)** for semantic understanding, meeting the requirement for Generative AI application in the e-commerce recommendation domain.
+**Key Innovation**: This project implements **Hybrid Search** combining:
 
-The goal of this project is to demonstrate how recommendation algorithms enhanced with Generative AI can improve customer experience in the e-commerce domain, particularly within the electrical appliance industry.
+- **BM25 Algorithm**: Industry-standard keyword search (used by Elasticsearch, Solr)
+- **Semantic Embeddings**: Sentence Transformers (BERT-based) for semantic understanding
+- **Generative AI Chatbot**: GPT-2 LLM for natural language product queries
+
+The goal is to demonstrate how modern recommendation algorithms enhanced with AI can improve customer experience in e-commerce, particularly within the electrical appliance industry.
 
 ### Key Highlights
 
-- 🤖 **Generative AI Integration**: Uses Sentence Transformers (BERT-based) for semantic understanding and embeddings
-- 💬 **AI Chatbot Assistant**: Interactive chatbot powered by GPT-2 LLM for natural language product queries
-- 🎯 **Intelligent Recommendations**: Uses TF-IDF vectorization and cosine similarity for accurate product matching
-- 🧠 **Semantic Understanding**: LLM-powered embeddings capture meaning and context beyond keyword matching
-- 🖥️ **User-Friendly GUI**: Modern desktop application with tabbed interface (Search & Chat)
+- 🔍 **Hybrid Search**: Combines BM25 (keyword) + Semantic Embeddings (understanding) for optimal results
+- 🤖 **Generative AI Integration**: Uses Sentence Transformers (BERT-based) for semantic embeddings
+- 💬 **AI Chatbot Assistant**: Interactive chatbot powered by GPT-2 LLM for natural language queries
+- 🎯 **Intelligent Recommendations**: Advanced filtering, sorting, and similarity matching
+- 🧠 **Semantic Understanding**: LLM-powered embeddings capture meaning beyond keyword matching
+- 🖥️ **User-Friendly GUI**: Modern desktop application with tabbed interface
 - 🔍 **Advanced Filtering**: Filter by product type, brand, budget, and sorting preferences
 - 🔗 **Product Links**: Direct access to product URLs for easy browsing
 - 📊 **Similar Products**: "You May Also Like" feature for discovering related items
 - 📚 **Knowledge Base**: Auto-generated product knowledge base for enhanced chatbot responses
 - 🎨 **Modern UI**: Dark-themed interface with ChatGPT-style chat interface
+- 📈 **Comprehensive Evaluation**: Built-in evaluation framework with metrics and reports
 
 ---
 
@@ -51,6 +57,8 @@ The goal of this project is to demonstrate how recommendation algorithms enhance
   - `torch` – PyTorch backend for sentence transformers and LLM models
   - `nltk` – advanced text preprocessing (optional)
   - `Pillow` – image processing for logo display
+  - `scipy` – statistical analysis for A/B testing
+  - `psutil` – system resource monitoring
 - **GUI Framework:** `tkinter` (built-in Python library)
 - **Data Source:** CSV dataset containing home appliance SKUs from Lowe's
 - **Generative AI Models:**
@@ -73,14 +81,14 @@ product-recommendation-system/
 │   │
 │   ├── core/                     # Core recommendation engine
 │   │   ├── __init__.py
-│   │   ├── recommender_engine.py  # Main recommendation engine with GenAI
+│   │   ├── recommender_engine.py  # Main recommendation engine with Hybrid Search
 │   │   └── config.py             # Configuration management
 │   │
 │   ├── ui/                       # User interface components
 │   │   ├── __init__.py
 │   │   ├── app_gui.py            # Main GUI application
-│   │   ├── ui_components.py       # UI component creation functions
-│   │   ├── ui_handlers.py       # UI event handlers and business logic
+│   │   ├── ui_components.py      # UI component creation functions
+│   │   ├── ui_handlers.py        # UI event handlers and business logic
 │   │   ├── ui_constants.py       # UI constants (colors, fonts, etc.)
 │   │   ├── ui_styles.py          # UI styling functions
 │   │   └── evaluation_ui.py      # Evaluation tab UI handlers
@@ -100,7 +108,7 @@ product-recommendation-system/
 │       ├── __init__.py
 │       ├── chatbot.py            # AI chatbot with LLM support
 │       ├── chatbot_ui.py         # Chatbot UI components (ChatGPT-style)
-│       └── chatbot_trainer.py    # Knowledge base generator
+│       └── chatbot_trainer.py   # Knowledge base generator
 │
 ├── tests/                        # Unit tests
 │   ├── __init__.py
@@ -114,7 +122,8 @@ product-recommendation-system/
 │
 ├── docs/                         # Documentation
 │   ├── TRAINING_GUIDE.md         # Chatbot training documentation
-│   └── REQUIREMENTS_COMPLIANCE.md # Requirements compliance documentation
+│   ├── REQUIREMENTS_COMPLIANCE.md # Requirements compliance documentation
+│   └── REQUIREMENTS_VERIFICATION.md # Requirements verification report
 │
 ├── assets/                       # Static assets
 │   └── inti logo.png             # Application logo
@@ -134,18 +143,19 @@ product-recommendation-system/
 
 ### Recommendation Engine
 
-- **Generative AI (LLM)**: Uses Sentence Transformers (BERT-based) for semantic embeddings
-  - Captures meaning and context beyond keyword matching
-  - Understands synonyms, related terms, and product relationships
-  - Generates high-dimensional semantic vectors for products and queries
-  - Model caching: Downloads and caches models locally for offline use
-- **Content-Based Filtering**: Analyzes product names and brands using TF-IDF vectorization
-- **Hybrid Approach**: Can use both GenAI embeddings and TF-IDF (GenAI takes precedence when enabled)
+- **Hybrid Search**: Combines BM25 (keyword matching) + Semantic Embeddings (understanding)
+  - BM25: Industry-standard keyword search algorithm (used by Elasticsearch, Solr)
+  - Semantic Embeddings: Sentence Transformers (BERT-based) for semantic understanding
+  - Weighted combination: BM25 (40%) + Semantic (60%) by default (tunable)
+- **Content-Based Filtering**: Analyzes product names and brands using multiple methods
+- **Progressive Enhancement**: Falls back gracefully if AI models aren't available
 - **Cosine Similarity**: Computes similarity scores between products for accurate recommendations
 - **Dynamic Brand Filtering**: Automatically filters available brands based on product type
 - **Budget Constraints**: Filter recommendations by price ranges (Under $100, $300, $500, $1000, $2000)
 - **Multiple Sorting Options**: Sort by similarity, price (low-to-high/high-to-low), or rating
 - **Similar Products Discovery**: Find related products based on selected items
+- **Model Caching**: Downloads and caches models locally for offline use
+- **Embedding Caching**: Caches generated embeddings for faster startup
 
 ### AI Chatbot Assistant
 
@@ -159,6 +169,7 @@ product-recommendation-system/
 - **Context Awareness**: Understands product queries, brand preferences, and budget constraints
 - **ChatGPT-Style UI**: Modern chat interface with message bubbles and timestamps
 - **Auto-Training**: Automatically generates training data from CSV on first run
+- **Lazy Loading**: Chatbot initializes only when chat tab is accessed (faster startup)
 
 ### User Interface
 
@@ -168,9 +179,10 @@ product-recommendation-system/
 - **Similar Products Section**: Shows related products when clicking on a recommendation
 - **Product URL Integration**: Double-click to open product links in browser
 - **Real-time Search**: Instant brand filtering based on product query
-- **Export Functionality**: Export search results to CSV or JSON format
-- **Responsive Design**: Adapts to window resizing with proper scrolling
+- **Background Model Loading**: Models load in background for faster startup
+- **Status Indicators**: Visual feedback for model loading and search status
 - **Evaluation Tab**: View performance metrics, baseline comparisons, and run evaluations directly in GUI
+- **Responsive Design**: Adapts to window resizing with proper scrolling
 
 ### Evaluation & Analysis
 
@@ -184,6 +196,7 @@ product-recommendation-system/
 - **Parameter Tuning**: BM25 parameters, hybrid weights, feature weights optimization
 - **A/B Testing**: Statistical significance testing for recommendation improvements
 - **Comprehensive Reports**: Auto-generated evaluation reports with all findings
+- **GUI Integration**: View and run evaluations directly in the application
 
 ---
 
@@ -193,6 +206,7 @@ product-recommendation-system/
 
 - Python 3.10 or higher
 - pip (Python package manager)
+- 2GB+ free disk space (for AI models)
 
 ### Step 1: Clone the Repository
 
@@ -249,8 +263,11 @@ On first run, the application will:
    - Knowledge base from CSV dataset (~10-30 seconds)
    - Training prompts for chatbot
    - Saved in `training_data/` directory
+3. **Generate Embeddings** (if not cached):
+   - Semantic embeddings for all products (~1-2 minutes)
+   - Cached in `embeddings_cache/` directory for faster future startups
 
-**Note:** The first run may take a few minutes to download models. Subsequent runs are instant as models are cached locally.
+**Note:** The first run may take a few minutes to download models and generate embeddings. Subsequent runs are instant as models and embeddings are cached locally.
 
 The GUI application will launch automatically. No browser access needed - it's a desktop application!
 
@@ -271,6 +288,8 @@ The GUI application will launch automatically. No browser access needed - it's a
    - Price: High to Low - Most expensive first
    - Rating: Best First - Highest rated first
 5. **Click Search**: View recommendations in the main table
+6. **View Similar Products**: Click on any product to see similar items in the "You May Also Like" section
+7. **Open Product URL**: Double-click any product row to open its URL in your browser
 
 ### AI Assistant Tab
 
@@ -284,10 +303,13 @@ The GUI application will launch automatically. No browser access needed - it's a
 4. **Get Recommendations**: The chatbot can recommend products directly in the conversation
 5. **Clear Chat**: Use "Clear Chat" button to start a new conversation
 
+**Note:** The chatbot initializes lazily (only when you access the chat tab) for faster application startup.
+
 ### Evaluation Tab
 
 1. **View Metrics**: Automatically loads latest evaluation results if available
 2. **Run Quick Evaluation**: Click "Run Quick Evaluation" to generate comprehensive metrics
+   - This runs in the background and may take a few minutes
 3. **View Full Report**: Click "View Full Report" to open detailed text report
 4. **Open Results Folder**: Access all evaluation JSON and report files
 5. **Refresh Results**: Reload latest evaluation results
@@ -297,8 +319,8 @@ The GUI application will launch automatically. No browser access needed - it's a
 - **View Product Details**: Double-click any product row to open its URL in your browser
 - **Find Similar Products**: Single-click a product to see similar items in the "You May Also Like" section
 - **Dynamic Brand Filtering**: The brand dropdown automatically updates based on your product query
-- **Export Results**: Export search results to CSV or JSON format (when available)
 - **Smart Suggestions**: Chatbot suggestions adapt based on your search history
+- **Background Model Loading**: Models load in background - search works immediately with basic mode
 
 ---
 
@@ -317,7 +339,8 @@ The dataset is preprocessed automatically:
 
 - Text cleaning and normalization
 - Feature extraction from product names and brands
-- TF-IDF vectorization for similarity computation
+- BM25 indexing for keyword search
+- Semantic embedding generation for semantic search
 
 ---
 
@@ -327,11 +350,14 @@ The dataset is preprocessed automatically:
 
 1. **Data Loading**: The system loads product data from the CSV file
 2. **Text Preprocessing**: Product names and brands are cleaned and normalized
-3. **Vectorization**:
-   - **GenAI Mode**: Products are converted to semantic embeddings using Sentence Transformers
-   - **TF-IDF Mode**: Products are converted to TF-IDF vectors (fallback)
-4. **Query Processing**: User input is transformed into a query vector/embedding
-5. **Similarity Computation**: Cosine similarity is calculated between query and all products
+3. **Indexing**:
+   - **BM25 Index**: Products are indexed using BM25 algorithm for keyword matching
+   - **Semantic Embeddings**: Products are converted to semantic embeddings using Sentence Transformers
+   - **TF-IDF Matrix**: Fallback TF-IDF vectors (used if GenAI not available)
+4. **Query Processing**: User input is transformed into:
+   - BM25 query scores (keyword matching)
+   - Semantic query embedding (semantic understanding)
+5. **Hybrid Search**: Combines BM25 scores and semantic similarity with weighted average
 6. **Filtering & Sorting**: Results are filtered by brand/budget and sorted according to user preference
 7. **Ranking**: Top K most similar products are returned as recommendations
 
@@ -340,14 +366,20 @@ The dataset is preprocessed automatically:
 1. **Knowledge Base Generation**: Product information is extracted from CSV and organized
 2. **Training Data Creation**: Training prompts are generated automatically
 3. **Query Understanding**: User messages are analyzed for product queries, brands, and budgets
-4. **Out-of-Scope Detection**: Detects queries about non-appliance products (phones, laptops, TVs, etc.) and provides helpful guidance
+4. **Out-of-Scope Detection**: Detects queries about non-appliance products and provides helpful guidance
 5. **Response Generation**:
-   - **LLM Mode**: GPT-2 generates natural, conversational responses with optimized temperature and sampling
+   - **LLM Mode**: GPT-2 generates natural, conversational responses
    - **Rule-Based Mode**: Friendly fallback responses for common patterns
-   - **Natural Language**: Casual, friendly tone that feels like talking to a friend
 6. **Product Integration**: Chatbot can call recommendation engine to provide product suggestions
 
 ### Technical Details
+
+- **Hybrid Search Architecture**:
+
+  - **BM25 Algorithm**: Modern keyword search (k1=1.5, b=0.75)
+  - **Semantic Embeddings**: Sentence Transformers (all-MiniLM-L6-v2)
+  - **Weighted Combination**: BM25 (40%) + Semantic (60%) by default
+  - **Fallback Chain**: Hybrid → BM25 → TF-IDF (based on availability)
 
 - **Generative AI (Sentence Transformers)**:
 
@@ -380,12 +412,17 @@ The dataset is preprocessed automatically:
     - Optimized parameters: temperature=0.8, top_p=0.9 for natural variation
     - Multi-sentence responses for better conversation flow
     - **Completely Free**: Runs locally, no API costs, no usage limits
-    - **Note**: Can be upgraded to better local models (Ollama, DialoGPT, Phi-2) for improved quality
 
-- **TF-IDF (Term Frequency-Inverse Document Frequency)**: Weights terms based on their importance (fallback when GenAI not available)
+- **BM25 (Best Matching 25)**:
+
+  - Industry-standard ranking algorithm used by Elasticsearch, Solr, and major search engines
+  - Better than TF-IDF for keyword search
+  - Addresses TF-IDF limitations with term frequency saturation and document length normalization
+  - Tuned parameters (k1=1.5, b=0.75) for optimal ranking
+
 - **Cosine Similarity**: Measures the angle between vectors (0 = identical, 1 = completely different)
 - **Content-Based Filtering**: Recommends items similar to what the user is looking for, not based on other users' behavior
-- **Hybrid Architecture**: Seamlessly switches between GenAI embeddings and TF-IDF based on availability
+- **Hybrid Architecture**: Seamlessly switches between Hybrid, BM25, and TF-IDF based on availability
 - **Knowledge Base**: Auto-generated from CSV, contains product categories, brands, and price ranges
 
 ---
@@ -393,11 +430,14 @@ The dataset is preprocessed automatically:
 ## 📈 Performance & Scalability
 
 - **Efficient Processing**: Handles datasets with thousands of products
-- **Fast Search**: Real-time recommendations with minimal latency (~10-50ms per query)
+- **Fast Search**: Real-time recommendations with minimal latency (~10-50ms per query with cached embeddings)
 - **Memory Optimized**: Uses sparse matrices for efficient memory usage
 - **Scalable Architecture**: Can be extended to handle larger datasets
 - **Performance Metrics**: Comprehensive evaluation with Precision@K, Recall@K, NDCG, MAP
 - **Efficiency Analysis**: Query response time, memory usage, and scalability measurements included
+- **Model Caching**: Models cached locally for offline use
+- **Embedding Caching**: Embeddings cached for faster startup (instant on subsequent runs)
+- **Background Loading**: Models load in background for faster application startup
 
 ---
 
@@ -412,6 +452,7 @@ The dataset is preprocessed automatically:
 - **Advanced Chatbot**: Fine-tune chatbot on product-specific data for better responses
 - **User Profiles**: Save user preferences and search history
 - **Recommendation Explanations**: Show why products were recommended
+- **Advanced Hybrid Tuning**: Auto-tune hybrid weights based on query type
 
 ---
 
@@ -421,22 +462,22 @@ The dataset is preprocessed automatically:
 
 ```bash
 # Run the GUI application
-python app_gui.py
+python main.py
 # or
-python3 app_gui.py
+python3 main.py
 ```
 
 ### Running Comprehensive Evaluation
 
 ```bash
 # Full evaluation (includes all metrics, baselines, A/B testing, parameter tuning)
-python3 run_evaluation.py
+python3 -m src.evaluation.run_evaluation
 
 # Quick evaluation (faster, fewer queries)
-python3 run_evaluation.py --quick
+python3 -m src.evaluation.run_evaluation --quick
 
 # Custom CSV path and output directory
-python3 run_evaluation.py --csv-path "your_data.csv" --output-dir "results"
+python3 -m src.evaluation.run_evaluation --csv-path "data/home appliance skus lowes.csv" --output-dir "evaluation_results"
 ```
 
 **Evaluation includes:**
@@ -451,8 +492,8 @@ python3 run_evaluation.py --csv-path "your_data.csv" --output-dir "results"
 
 **Results are saved to:**
 
-- `evaluation_results/evaluation_results_YYYYMMDD_HHMMSS.json` - JSON with all metrics
-- `evaluation_results/evaluation_report_YYYYMMDD_HHMMSS.txt` - Human-readable report
+- `evaluation_results/evaluation_results.json` - JSON with all metrics
+- `evaluation_results/evaluation_report.txt` - Human-readable report
 
 **View in GUI:**
 
@@ -465,9 +506,9 @@ python3 run_evaluation.py --csv-path "your_data.csv" --output-dir "results"
 
 ```bash
 # Run unit tests
-python -m pytest test_recommender.py
+python -m pytest tests/test_recommender.py
 # or
-python test_recommender.py
+python tests/test_recommender.py
 ```
 
 ### Testing Recommendations
@@ -545,6 +586,7 @@ This project aligns with:
 
 - See [docs/TRAINING_GUIDE.md](docs/TRAINING_GUIDE.md) for information about chatbot training data generation
 - See [docs/REQUIREMENTS_COMPLIANCE.md](docs/REQUIREMENTS_COMPLIANCE.md) for requirements compliance documentation
+- See [docs/REQUIREMENTS_VERIFICATION.md](docs/REQUIREMENTS_VERIFICATION.md) for requirements verification report
 
 ---
 

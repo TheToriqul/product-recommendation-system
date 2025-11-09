@@ -17,22 +17,21 @@ This document provides a comprehensive verification of all requirements against 
 **Implementation**:
 
 - **File**: `src/core/recommender_engine.py`
-- **Class**: `TextPreprocessor` (lines 70-268)
+- **Class**: `TextPreprocessor` (lines 228-268)
 - **Features**:
   - ✅ Text cleaning and normalization
-  - ✅ Advanced preprocessing (stemming, lemmatization) via NLTK
+  - ✅ Advanced preprocessing (stemming, lemmatization) via NLTK (optional)
   - ✅ Feature extraction from product names and brands
   - ✅ TF-IDF vectorization (`TfidfVectorizer`)
+  - ✅ BM25 indexing (`BM25` class, lines 270-352)
   - ✅ Semantic embeddings (Sentence Transformers - Generative AI)
-  - ✅ BM25 indexing for keyword search
 
 **Code Evidence**:
 
-```python
-# TextPreprocessor class with comprehensive preprocessing
-# BM25 class for keyword search
-# Semantic embeddings via Sentence Transformers
-```
+- Lines 228-268: TextPreprocessor class with comprehensive preprocessing
+- Lines 270-352: BM25 class implementation
+- Lines 454-550: Model and embedding loading
+- Lines 636-683: TF-IDF vectorizer initialization
 
 ---
 
@@ -44,7 +43,7 @@ This document provides a comprehensive verification of all requirements against 
 
 - User-item interaction matrices are used in **collaborative filtering** approaches
 - This project uses **content-based filtering**, which relies on **item features** rather than user interactions
-- The system uses **item feature vectors** (TF-IDF, embeddings) instead
+- The system uses **item feature vectors** (TF-IDF, BM25, semantic embeddings) instead
 - This is the correct approach for content-based systems
 
 **Documentation**: `docs/REQUIREMENTS_COMPLIANCE.md` (lines 17-20)
@@ -68,11 +67,11 @@ This document provides a comprehensive verification of all requirements against 
 **Code Evidence**:
 
 - Lines 22-89: BM25 parameter tuning
-- Lines 91-158: Hybrid weight tuning
-- Lines 160-227: Feature weight tuning
-- Lines 229-326: Best parameter finding and reporting
+- Lines 81-163: Hybrid weight tuning
+- Lines 166-250: Feature weight tuning
+- Lines 253-297: Best parameter finding and reporting
 
-**Integration**: Called in `src/evaluation/run_evaluation.py` (lines 38-44)
+**Integration**: Called in `src/evaluation/run_evaluation.py` (lines 338-357)
 
 ---
 
@@ -83,7 +82,7 @@ This document provides a comprehensive verification of all requirements against 
 **Implementation**:
 
 - **File**: `src/core/recommender_engine.py`
-- **Method**: `recommend()` (lines 600-750+)
+- **Method**: `recommend()` (lines 1105-1312)
 - **Features**:
   - ✅ Product query search
   - ✅ Brand filtering (dynamic based on product type)
@@ -95,16 +94,9 @@ This document provides a comprehensive verification of all requirements against 
 
 **Code Evidence**:
 
-```python
-def recommend(
-    self,
-    product_query: str,
-    brand: Optional[str] = None,
-    budget: Optional[float] = None,
-    top_k: int = 10,
-    sort_by: str = 'similarity'
-) -> List[Dict[str, Any]]
-```
+- Lines 1105-1312: Complete recommendation method with hybrid search
+- Lines 1179-1207: Hybrid search implementation (BM25 + Semantic)
+- Lines 1066-1103: Result processing with filtering
 
 ---
 
@@ -147,14 +139,14 @@ def recommend(
 - **File**: `src/evaluation/evaluation_metrics.py`
 - **Functions**:
   - ✅ `precision_at_k()` (lines 20-39)
-  - ✅ `recall_at_k()` (lines 42-60)
-  - ✅ `ndcg_at_k()` (lines 63-95)
-  - ✅ `mean_average_precision()` (lines 98-130)
-  - ✅ `evaluate_recommendations()` (lines 133-245) - Comprehensive evaluation
+  - ✅ `recall_at_k()` (lines 42-61)
+  - ✅ `ndcg_at_k()` (lines 87-114)
+  - ✅ `mean_average_precision()` (lines 117-148)
+  - ✅ `evaluate_recommendations()` (lines 198-223) - Comprehensive evaluation
 
 **Integration**:
 
-- Called in `run_evaluation.py` (line 29)
+- Called in `run_evaluation.py` (line 201)
 - Displayed in GUI Evaluation tab (`src/ui/evaluation_ui.py`)
 - Included in evaluation reports
 
@@ -174,9 +166,9 @@ def recommend(
 
 - **File**: `src/evaluation/evaluation_metrics.py`
 - **Functions**:
-  - ✅ `rmse()` (lines 148-165)
-  - ✅ `mae()` (lines 168-185)
-  - ✅ `evaluate_rating_predictions()` (lines 188-245)
+  - ✅ `rmse()` (lines 151-172)
+  - ✅ `mae()` (lines 175-195)
+  - ✅ `evaluate_rating_predictions()` (lines 226-243)
 
 **Explanation**:
 
@@ -196,7 +188,7 @@ def recommend(
 **Implementation**:
 
 - **File**: `src/evaluation/ab_testing.py`
-- **Class**: `ABTestFramework` (lines 24-335)
+- **Class**: `ABTestFramework` (lines 24-309)
 - **Features**:
   - ✅ Control and treatment group assignment
   - ✅ User satisfaction simulation (CTR, ratings, engagement)
@@ -207,18 +199,15 @@ def recommend(
 
 **Code Evidence**:
 
-```python
-class ABTestFramework:
-    def assign_users(self, num_users: int, split_ratio: float = 0.5)
-    def run_test(self, top_k: int = 10)
-    def calculate_user_satisfaction(self, recommendations: List[int])
-    def test_statistical_significance(self, metric: str = 'ctr')
-    def generate_report(self) -> Dict[str, Any]
-```
+- Lines 48-69: User assignment
+- Lines 71-132: User interaction simulation
+- Lines 134-189: Satisfaction simulation
+- Lines 191-273: Statistical analysis
+- Lines 275-309: Complete A/B test execution
 
 **Integration**:
 
-- Called in `run_evaluation.py` (line 45)
+- Called in `run_evaluation.py` (lines 360-382)
 - Results included in evaluation reports
 - Displayed in GUI Evaluation tab
 
@@ -232,12 +221,12 @@ class ABTestFramework:
 
 - **File**: `src/evaluation/diversity_metrics.py`
 - **Functions**:
-  - ✅ `intra_list_diversity()` (lines 18-67) - ILD metric
-  - ✅ `category_diversity()` (lines 70-95) - Category diversity
-  - ✅ `brand_diversity()` (lines 98-120) - Brand diversity
-  - ✅ `novelty_score()` (lines 123-180) - Novelty measurement
-  - ✅ `catalog_coverage()` (lines 183-217) - Coverage percentage
-  - ✅ `evaluate_diversity_novelty_coverage()` (lines 220-267) - Comprehensive evaluation
+  - ✅ `intra_list_diversity()` (lines 18-66) - ILD metric
+  - ✅ `category_diversity()` (lines 69-103) - Category diversity
+  - ✅ `brand_diversity()` (lines 165-198) - Brand diversity
+  - ✅ `novelty()` (lines 106-134) - Novelty measurement
+  - ✅ `catalog_coverage()` (lines 137-162) - Coverage percentage
+  - ✅ `evaluate_diversity_novelty_coverage()` (lines 201-265) - Comprehensive evaluation
 
 **Metrics**:
 
@@ -247,7 +236,7 @@ class ABTestFramework:
 
 **Integration**:
 
-- Called in `run_evaluation.py` (line 30)
+- Called in `run_evaluation.py` (lines 242-305)
 - Results included in evaluation reports
 - Displayed in GUI Evaluation tab with professional card-based UI
 
@@ -270,16 +259,14 @@ class ABTestFramework:
 
 **Code Evidence**:
 
-```python
-class ColdStartHandler:
-    def handle_new_user(self, query: str, top_k: int = 10)
-    def handle_new_item(self, new_item_features: Dict[str, Any], top_k: int = 10)
-    def evaluate_cold_start_performance(self, test_cases: List[Dict])
-```
+- Lines 32-69: New user handling
+- Lines 71-102: New item handling
+- Lines 104-154: Popular items fallback
+- Lines 175-218: Performance evaluation
 
 **Integration**:
 
-- Called in `run_evaluation.py` (line 32)
+- Called in `run_evaluation.py` (lines 307-323)
 - Results included in evaluation reports
 - Displayed in GUI Evaluation tab
 
@@ -293,7 +280,7 @@ class ColdStartHandler:
 
 - **File**: `src/evaluation/scalability_efficiency.py`
 - **Functions**:
-  - ✅ `measure_query_performance()` - Query response time
+  - ✅ `measure_query_time()` - Query response time
   - ✅ `measure_memory_usage()` - Memory consumption
   - ✅ `measure_model_loading_time()` - Model initialization time
   - ✅ `comprehensive_efficiency_analysis()` - Full analysis
@@ -309,7 +296,7 @@ class ColdStartHandler:
 
 **Integration**:
 
-- Called in `run_evaluation.py` (lines 33-37)
+- Called in `run_evaluation.py` (lines 325-335)
 - Results included in evaluation reports
 - Displayed in GUI Evaluation tab
 
@@ -324,14 +311,14 @@ class ColdStartHandler:
 - **File**: `src/evaluation/baseline_comparison.py`
 - **Classes**:
   - ✅ `RandomBaseline` (lines 44-50) - Random product recommendations
-  - ✅ `TFIDFBaseline` (lines 53-85) - TF-IDF only
-  - ✅ `BM25Baseline` (lines 88-120) - BM25 only
-  - ✅ `HybridBaseline` (lines 123-155) - Hybrid (BM25 + Semantic)
+  - ✅ `TFIDFBaseline` (lines 53-95) - TF-IDF only
+  - ✅ `BM25Baseline` (lines 98-141) - BM25 only
+  - ✅ `HybridRecommender` (lines 144-183) - Hybrid (BM25 + Semantic)
 
 **Functions**:
 
-- ✅ `evaluate_baselines_with_metrics()` (lines 158-245) - Comprehensive evaluation
-- ✅ `compare_baselines()` (lines 248-295) - Comparison analysis
+- ✅ `evaluate_baselines_with_metrics()` (lines 239-293) - Comprehensive evaluation
+- ✅ `compare_baselines()` (lines 186-236) - Comparison analysis
 
 **Baselines Compared**:
 
@@ -344,7 +331,7 @@ class ColdStartHandler:
 
 **Integration**:
 
-- Called in `run_evaluation.py` (line 31)
+- Called in `run_evaluation.py` (lines 224-240)
 - Results included in evaluation reports
 - Displayed in GUI Evaluation tab with summary cards per method
 
@@ -369,7 +356,8 @@ class ColdStartHandler:
 
 - Lines 270-352: BM25 class implementation
 - Lines 454-550: Model and embedding loading
-- Lines 600-750+: Recommendation with hybrid search
+- Lines 636-683: TF-IDF vectorizer initialization
+- Lines 758-796: Semantic embedding generation
 
 ---
 
@@ -407,7 +395,7 @@ class ColdStartHandler:
 
 **Code Evidence**:
 
-- Lines 600-750+: `recommend()` method with hybrid search
+- Lines 1179-1207: Hybrid search combining BM25 and semantic scores
 - BM25 scores combined with semantic similarity scores
 - Configurable weights: `hybrid_weight_bm25 = 0.4`, `hybrid_weight_semantic = 0.6`
 
@@ -420,7 +408,7 @@ class ColdStartHandler:
 **Implementation**:
 
 - **File**: `src/core/recommender_engine.py`
-- **Method**: `recommend()` (lines 600-750+)
+- **Method**: `recommend()` (lines 1105-1312)
 - **Features**:
   - ✅ Full recommendation pipeline
   - ✅ Filtering (brand, budget)
@@ -439,8 +427,8 @@ class ColdStartHandler:
 **Implementation**:
 
 - **Files**:
-  - `src/ui/app_gui.py` - Main GUI with Evaluation tab (lines 243-258)
-  - `src/ui/evaluation_ui.py` - Evaluation UI handlers (787 lines)
+  - `src/ui/app_gui.py` - Main GUI with Evaluation tab (lines 240-258)
+  - `src/ui/evaluation_ui.py` - Evaluation UI handlers (1137 lines)
   - `src/ui/ui_components.py` - UI component creation
 
 **Features**:
@@ -474,8 +462,8 @@ class ColdStartHandler:
 
 **Files**:
 
-- ✅ `README.md` - Complete project documentation (572 lines)
-- ✅ `docs/REQUIREMENTS_COMPLIANCE.md` - Requirements compliance (203 lines)
+- ✅ `README.md` - Complete project documentation
+- ✅ `docs/REQUIREMENTS_COMPLIANCE.md` - Requirements compliance
 - ✅ `docs/TRAINING_GUIDE.md` - Chatbot training guide
 - ✅ `docs/REQUIREMENTS_VERIFICATION.md` - This verification report
 
@@ -555,5 +543,5 @@ The project demonstrates:
 
 ---
 
-**Generated**: 2025-11-09  
+**Generated**: 2025-01-XX  
 **Verification Status**: ✅ **COMPLETE**

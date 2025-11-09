@@ -168,7 +168,12 @@ class ProdRecommendationApp:
         main_frame.pack(fill=tk.BOTH, expand=True)
         
         # Create header
-        logo_path = os.path.join(os.path.dirname(__file__), "assets", "inti logo.png")
+        # Get project root (go up from src/ui to project root)
+        current_file = os.path.abspath(__file__)
+        ui_dir = os.path.dirname(current_file)  # src/ui
+        src_dir = os.path.dirname(ui_dir)        # src
+        project_root = os.path.dirname(src_dir)  # project_root
+        logo_path = os.path.join(project_root, "assets", "inti logo.png")
         create_header(main_frame, self.use_advanced, logo_path)
         
         # Create notebook for tabs (Search and Chat)
