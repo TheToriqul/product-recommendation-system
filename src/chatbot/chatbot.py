@@ -12,7 +12,7 @@ import shutil
 
 # Try to import chatbot trainer for knowledge base
 try:
-    from chatbot_trainer import ProductKnowledgeBase, TRAINING_DATA_DIR, ensure_training_data_ready
+    from src.chatbot.chatbot_trainer import ProductKnowledgeBase, TRAINING_DATA_DIR, ensure_training_data_ready
     TRAINER_AVAILABLE = True
 except ImportError:
     TRAINER_AVAILABLE = False

@@ -45,7 +45,7 @@ except ImportError:
     NLTK_AVAILABLE = False
 
 try:
-    from config import get_csv_path, get_log_level
+    from src.core.config import get_csv_path, get_log_level
 except ImportError:
     def get_csv_path() -> str:
         return "home appliance skus lowes.csv"

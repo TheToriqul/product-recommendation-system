@@ -12,7 +12,7 @@ from datetime import datetime
 import webbrowser
 import re
 
-from ui_constants import (
+from src.ui.ui_constants import (
     BG_COLOR_CARD, BG_COLOR_ENTRY, BG_COLOR_HOVER, BORDER_COLOR,
     FG_COLOR_WHITE, FG_COLOR_TEXT, FG_COLOR_SECONDARY,
     FONT_FAMILY, FONT_SIZE_HEADING, FONT_SIZE_NORMAL, FONT_SIZE_BOLD,

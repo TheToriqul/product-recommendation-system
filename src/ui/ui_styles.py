@@ -6,7 +6,7 @@ This module handles styling configuration for Tkinter ttk widgets.
 
 import tkinter as tk
 from tkinter import ttk
-from ui_constants import (
+from src.ui.ui_constants import (
     BG_COLOR_ENTRY, BG_COLOR_INPUT, BG_COLOR_DARK, BORDER_COLOR,
     FG_COLOR_WHITE, FG_COLOR_TEXT, ACCENT_COLOR,
     FONT_FAMILY, FONT_SIZE_NORMAL, FONT_SIZE_BOLD

@@ -63,30 +63,69 @@ The goal of this project is to demonstrate how recommendation algorithms enhance
 
 ```
 product-recommendation-system/
-├── app_gui.py                    # Main GUI application (entry point)
-├── recommender_engine.py         # Core recommendation engine with GenAI
-├── chatbot.py                    # AI chatbot with LLM support
-├── chatbot_ui.py                 # Chatbot UI components (ChatGPT-style)
-├── chatbot_trainer.py            # Knowledge base generator
-├── config.py                     # Configuration management
-├── ui_components.py              # UI component creation functions
-├── ui_handlers.py                # UI event handlers and business logic
-├── ui_constants.py               # UI constants (colors, fonts, etc.)
-├── ui_styles.py                  # UI styling functions
-├── test_recommender.py           # Unit tests
-├── home appliance skus lowes.csv  # Product dataset
+├── main.py                       # Main entry point (run this to start the app)
 ├── requirements.txt              # Python dependencies
-├── TRAINING_GUIDE.md             # Chatbot training documentation
 ├── README.md                     # Project documentation
 ├── LICENSE                       # MIT License
+│
+├── src/                          # Source code (organized by module)
+│   ├── __init__.py
+│   │
+│   ├── core/                     # Core recommendation engine
+│   │   ├── __init__.py
+│   │   ├── recommender_engine.py  # Main recommendation engine with GenAI
+│   │   └── config.py             # Configuration management
+│   │
+│   ├── ui/                       # User interface components
+│   │   ├── __init__.py
+│   │   ├── app_gui.py            # Main GUI application
+│   │   ├── ui_components.py       # UI component creation functions
+│   │   ├── ui_handlers.py       # UI event handlers and business logic
+│   │   ├── ui_constants.py       # UI constants (colors, fonts, etc.)
+│   │   ├── ui_styles.py          # UI styling functions
+│   │   └── evaluation_ui.py      # Evaluation tab UI handlers
+│   │
+│   ├── evaluation/               # Evaluation and metrics modules
+│   │   ├── __init__.py
+│   │   ├── evaluation_metrics.py # Core metrics (Precision@K, Recall@K, NDCG, MAP, RMSE, MAE)
+│   │   ├── diversity_metrics.py  # Diversity, novelty, and coverage analysis
+│   │   ├── baseline_comparison.py # Baseline method comparisons
+│   │   ├── cold_start.py         # Cold start problem handling
+│   │   ├── scalability_efficiency.py # Performance and efficiency measurements
+│   │   ├── parameter_tuning.py   # Hyperparameter tuning demonstration
+│   │   ├── ab_testing.py         # A/B testing framework
+│   │   └── run_evaluation.py     # Main evaluation script
+│   │
+│   └── chatbot/                  # Chatbot and AI assistant
+│       ├── __init__.py
+│       ├── chatbot.py            # AI chatbot with LLM support
+│       ├── chatbot_ui.py         # Chatbot UI components (ChatGPT-style)
+│       └── chatbot_trainer.py    # Knowledge base generator
+│
+├── tests/                        # Unit tests
+│   ├── __init__.py
+│   └── test_recommender.py       # Tests for recommendation engine
+│
+├── data/                         # Data files
+│   ├── home appliance skus lowes.csv  # Product dataset
+│   └── training_data/            # Chatbot training data (auto-generated)
+│       ├── knowledge_base.json
+│       └── training_prompts.json
+│
+├── docs/                         # Documentation
+│   ├── TRAINING_GUIDE.md         # Chatbot training documentation
+│   └── REQUIREMENTS_COMPLIANCE.md # Requirements compliance documentation
+│
+├── assets/                       # Static assets
+│   └── inti logo.png             # Application logo
+│
 ├── models/                       # Cached AI models (auto-downloaded)
 │   ├── all-MiniLM-L6-v2/        # Sentence Transformer model
 │   └── gpt2/                     # GPT-2 chatbot model
-├── training_data/                # Auto-generated training data
-│   ├── knowledge_base.json       # Product knowledge base
-│   └── training_prompts.json    # Chatbot training prompts
-└── assets/                       # Application assets
-    └── inti logo.png            # University logo
+│
+├── embeddings_cache/             # Cached embeddings (auto-generated)
+│
+└── evaluation_results/           # Evaluation results and reports (auto-generated)
 ```
 
 ---
@@ -123,7 +162,7 @@ product-recommendation-system/
 
 ### User Interface
 
-- **Tabbed Interface**: Two tabs - "Search Products" and "AI Assistant"
+- **Tabbed Interface**: Three tabs - "Search Products", "AI Assistant", and "📊 Evaluation"
 - **Modern Dark Theme**: Clean and professional desktop interface
 - **Interactive Tables**: Display recommendations with product details (name, brand, price, rating, similarity)
 - **Similar Products Section**: Shows related products when clicking on a recommendation
@@ -131,6 +170,20 @@ product-recommendation-system/
 - **Real-time Search**: Instant brand filtering based on product query
 - **Export Functionality**: Export search results to CSV or JSON format
 - **Responsive Design**: Adapts to window resizing with proper scrolling
+- **Evaluation Tab**: View performance metrics, baseline comparisons, and run evaluations directly in GUI
+
+### Evaluation & Analysis
+
+- **Performance Metrics**: Precision@K, Recall@K, NDCG, MAP (RMSE/MAE documented as not applicable for content-based)
+- **Baseline Comparisons**: Compare Hybrid approach vs Random, TF-IDF only, BM25 only
+- **Diversity Analysis**: Intra-list diversity, category diversity, brand diversity
+- **Novelty Metrics**: Measure recommendation unexpectedness
+- **Coverage Analysis**: Catalog coverage percentage
+- **Cold Start Handling**: Strategies for new users and new items
+- **Scalability Testing**: Query response time, memory usage, efficiency measurements
+- **Parameter Tuning**: BM25 parameters, hybrid weights, feature weights optimization
+- **A/B Testing**: Statistical significance testing for recommendation improvements
+- **Comprehensive Reports**: Auto-generated evaluation reports with all findings
 
 ---
 
@@ -177,9 +230,9 @@ pip3 install -r requirements.txt
 
 ```bash
 # On Windows:
-python app_gui.py
+python main.py
 # On macOS/Linux:
-python3 app_gui.py
+python3 main.py
 ```
 
 **Note:** On macOS and Linux, use `python3` and `pip3`. On Windows, `python` and `pip` should work. If `python` doesn't work on Windows, try `py` or `python3`.
@@ -230,6 +283,14 @@ The GUI application will launch automatically. No browser access needed - it's a
 3. **Use Quick Suggestions**: Click on quick suggestion buttons for common queries
 4. **Get Recommendations**: The chatbot can recommend products directly in the conversation
 5. **Clear Chat**: Use "Clear Chat" button to start a new conversation
+
+### Evaluation Tab
+
+1. **View Metrics**: Automatically loads latest evaluation results if available
+2. **Run Quick Evaluation**: Click "Run Quick Evaluation" to generate comprehensive metrics
+3. **View Full Report**: Click "View Full Report" to open detailed text report
+4. **Open Results Folder**: Access all evaluation JSON and report files
+5. **Refresh Results**: Reload latest evaluation results
 
 ### Advanced Features
 
@@ -332,9 +393,11 @@ The dataset is preprocessed automatically:
 ## 📈 Performance & Scalability
 
 - **Efficient Processing**: Handles datasets with thousands of products
-- **Fast Search**: Real-time recommendations with minimal latency
+- **Fast Search**: Real-time recommendations with minimal latency (~10-50ms per query)
 - **Memory Optimized**: Uses sparse matrices for efficient memory usage
 - **Scalable Architecture**: Can be extended to handle larger datasets
+- **Performance Metrics**: Comprehensive evaluation with Precision@K, Recall@K, NDCG, MAP
+- **Efficiency Analysis**: Query response time, memory usage, and scalability measurements included
 
 ---
 
@@ -352,7 +415,7 @@ The dataset is preprocessed automatically:
 
 ---
 
-## 🧪 Testing
+## 🧪 Testing & Evaluation
 
 ### Running the Application
 
@@ -362,6 +425,41 @@ python app_gui.py
 # or
 python3 app_gui.py
 ```
+
+### Running Comprehensive Evaluation
+
+```bash
+# Full evaluation (includes all metrics, baselines, A/B testing, parameter tuning)
+python3 run_evaluation.py
+
+# Quick evaluation (faster, fewer queries)
+python3 run_evaluation.py --quick
+
+# Custom CSV path and output directory
+python3 run_evaluation.py --csv-path "your_data.csv" --output-dir "results"
+```
+
+**Evaluation includes:**
+
+- Performance metrics (Precision@K, Recall@K, NDCG, MAP)
+- Baseline comparisons (Random, TF-IDF, BM25, Hybrid)
+- Diversity, novelty, and coverage analysis
+- Cold start problem handling
+- Scalability and efficiency measurements
+- Parameter tuning (BM25, hybrid weights, feature weights)
+- A/B testing with statistical significance
+
+**Results are saved to:**
+
+- `evaluation_results/evaluation_results_YYYYMMDD_HHMMSS.json` - JSON with all metrics
+- `evaluation_results/evaluation_report_YYYYMMDD_HHMMSS.txt` - Human-readable report
+
+**View in GUI:**
+
+- Open the "📊 Evaluation" tab in the GUI
+- Click "Run Quick Evaluation" to generate metrics
+- View results directly in the application
+- Click "View Full Report" to open detailed text report
 
 ### Running Unit Tests
 
@@ -445,7 +543,8 @@ This project aligns with:
 
 ### Additional Resources
 
-- See [TRAINING_GUIDE.md](TRAINING_GUIDE.md) for information about chatbot training data generation
+- See [docs/TRAINING_GUIDE.md](docs/TRAINING_GUIDE.md) for information about chatbot training data generation
+- See [docs/REQUIREMENTS_COMPLIANCE.md](docs/REQUIREMENTS_COMPLIANCE.md) for requirements compliance documentation
 
 ---
 

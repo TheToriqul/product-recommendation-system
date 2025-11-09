@@ -12,22 +12,25 @@ from typing import List, Dict
 import os
 import threading
 
-from recommender_engine import ProductRecommender, GENAI_AVAILABLE
+# Set environment variable to suppress tokenizers parallelism warning
+os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+
+from src.core.recommender_engine import ProductRecommender, GENAI_AVAILABLE
 
 # Import UI modules
-from ui_constants import (
+from src.ui.ui_constants import (
     WINDOW_TITLE, WINDOW_SIZE, BG_COLOR_MAIN, BG_COLOR_DARK,
     BG_COLOR_INPUT, BG_COLOR_CARD, BG_COLOR_ENTRY, BG_COLOR_HOVER,
     FG_COLOR_WHITE, FG_COLOR_SECONDARY, SUCCESS_COLOR,
     FONT_FAMILY, FONT_SIZE_NORMAL,
     BUTTON_PRIMARY
 )
-from ui_styles import apply_styles
-from ui_components import (
+from src.ui.ui_styles import apply_styles
+from src.ui.ui_components import (
     create_header, create_input_section, create_results_section,
     create_similar_section, create_evaluation_tab
 )
-from ui_handlers import (
+from src.ui.ui_handlers import (
     handle_item_click, handle_item_double_click, handle_similar_double_click,
     show_similar_products, perform_search
 )
@@ -41,8 +44,8 @@ logger = logging.getLogger(__name__)
 
 # Import chatbot modules
 try:
-    from chatbot import ProductChatbot
-    from chatbot_ui import create_chatbot_panel
+    from src.chatbot.chatbot import ProductChatbot
+    from src.chatbot.chatbot_ui import create_chatbot_panel
     CHATBOT_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"Chatbot modules not available: {e}")
@@ -404,8 +407,8 @@ class ProdRecommendationApp:
     
     def _setup_evaluation_buttons(self) -> None:
         """Setup buttons for evaluation tab."""
-        from evaluation_ui import run_quick_evaluation, open_evaluation_report, open_evaluation_folder
-        from ui_constants import BUTTON_PRIMARY, BUTTON_PRIMARY_HOVER, FG_COLOR_WHITE, FONT_FAMILY, FONT_SIZE_NORMAL
+        from src.ui.evaluation_ui import run_quick_evaluation, open_evaluation_report, open_evaluation_folder
+        from src.ui.ui_constants import BUTTON_PRIMARY, BUTTON_PRIMARY_HOVER, FG_COLOR_WHITE, FONT_FAMILY, FONT_SIZE_NORMAL
         
         # Run Quick Evaluation button
         run_btn = tk.Button(
@@ -493,8 +496,8 @@ class ProdRecommendationApp:
     
     def _load_evaluation_results(self) -> None:
         """Load and display latest evaluation results."""
-        from evaluation_ui import load_latest_evaluation_results, render_evaluation_results
-        from ui_constants import FG_COLOR_SECONDARY, SUCCESS_COLOR
+        from src.ui.evaluation_ui import load_latest_evaluation_results, render_evaluation_results
+        from src.ui.ui_constants import FG_COLOR_SECONDARY, SUCCESS_COLOR
         
         results = load_latest_evaluation_results()
         
@@ -515,7 +518,7 @@ class ProdRecommendationApp:
             for widget in self.eval_scrollable_frame.winfo_children():
                 widget.destroy()
             
-            from ui_constants import BG_COLOR_MAIN, FG_COLOR_SECONDARY, FONT_FAMILY, FONT_SIZE_HEADING, FONT_SIZE_NORMAL
+            from src.ui.ui_constants import BG_COLOR_MAIN, FG_COLOR_SECONDARY, FONT_FAMILY, FONT_SIZE_HEADING, FONT_SIZE_NORMAL
             
             empty_frame = tk.Frame(self.eval_scrollable_frame, bg=BG_COLOR_MAIN)
             empty_frame.pack(fill=tk.BOTH, expand=True, pady=50)
@@ -554,8 +557,8 @@ class ProdRecommendationApp:
     
     def _run_evaluation(self) -> None:
         """Run quick evaluation in background."""
-        from evaluation_ui import run_quick_evaluation
-        from ui_constants import FG_COLOR_SECONDARY
+        from src.ui.evaluation_ui import run_quick_evaluation
+        from src.ui.ui_constants import FG_COLOR_SECONDARY
         
         self.eval_status_label.config(
             text="⏳ Running evaluation... This may take a few minutes. Please wait...",
@@ -569,7 +572,7 @@ class ProdRecommendationApp:
     
     def _on_evaluation_complete(self, success: bool, message: str) -> None:
         """Handle evaluation completion."""
-        from ui_constants import SUCCESS_COLOR, FG_COLOR_SECONDARY
+        from src.ui.ui_constants import SUCCESS_COLOR, FG_COLOR_SECONDARY
         
         if success:
             self.eval_status_label.config(
@@ -586,7 +589,7 @@ class ProdRecommendationApp:
     
     def _view_report(self) -> None:
         """Open the full evaluation report."""
-        from evaluation_ui import open_evaluation_report
+        from src.ui.evaluation_ui import open_evaluation_report
         
         report_path = open_evaluation_report()
         if report_path:

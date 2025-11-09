@@ -7,8 +7,14 @@ Or: python test_recommender.py
 
 import unittest
 import os
+import sys
 import pandas as pd
-from recommender_engine import ProductRecommender
+
+# Add project root to path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+
+from src.core.recommender_engine import ProductRecommender
 
 
 class TestProductRecommender(unittest.TestCase):
@@ -17,7 +23,7 @@ class TestProductRecommender(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up test fixtures."""
-        csv_path = "home appliance skus lowes.csv"
+        csv_path = "data/home appliance skus lowes.csv"
         if os.path.exists(csv_path):
             cls.recommender = ProductRecommender(csv_path)
         else:

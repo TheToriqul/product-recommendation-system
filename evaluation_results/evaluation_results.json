@@ -1,0 +1,134 @@
+{
+  "performance_metrics": {
+    "average": {
+      "Precision@5": 0.45,
+      "Recall@5": 0.15595238095238095,
+      "NDCG@5": 0.4841782093448699,
+      "Precision@10": 0.325,
+      "Recall@10": 0.2273809523809524,
+      "NDCG@10": 0.38606043724881944,
+      "MAP": 0.21904761904761907
+    },
+    "per_query": [
+      {
+        "Precision@5": 0.0,
+        "Recall@5": 0.0,
+        "NDCG@5": 0.0,
+        "Precision@10": 0.0,
+        "Recall@10": 0.0,
+        "NDCG@10": 0.0,
+        "MAP": 0.0,
+        "query": "refrigerator"
+      },
+      {
+        "Precision@5": 0.6,
+        "Recall@5": 0.2,
+        "NDCG@5": 0.7227265726449519,
+        "Precision@10": 0.3,
+        "Recall@10": 0.2,
+        "NDCG@10": 0.4690000933206748,
+        "MAP": 0.2,
+        "query": "washing machine"
+      },
+      {
+        "Precision@5": 0.2,
+        "Recall@5": 0.06666666666666667,
+        "NDCG@5": 0.21398626473452756,
+        "Precision@10": 0.1,
+        "Recall@10": 0.06666666666666667,
+        "NDCG@10": 0.13886244387355454,
+        "MAP": 0.03333333333333333,
+        "query": "microwave"
+      },
+      {
+        "Precision@5": 1.0,
+        "Recall@5": 0.35714285714285715,
+        "NDCG@5": 1.0,
+        "Precision@10": 0.9,
+        "Recall@10": 0.6428571428571429,
+        "NDCG@10": 0.9363792118010483,
+        "MAP": 0.6428571428571429,
+        "query": "air conditioner"
+      }
+    ]
+  },
+  "baseline_comparison": {
+    "Random": {
+      "Precision@5": 0.0,
+      "Recall@5": 0.0,
+      "NDCG@5": 0.0,
+      "Precision@10": 0.0,
+      "Recall@10": 0.0,
+      "NDCG@10": 0.0,
+      "MAP": 0.0
+    },
+    "TF-IDF Only": {
+      "Precision@5": 0.44999999999999996,
+      "Recall@5": 0.1523809523809524,
+      "NDCG@5": 0.5265732350040719,
+      "Precision@10": 0.25,
+      "Recall@10": 0.16904761904761906,
+      "NDCG@10": 0.36130956616344784,
+      "MAP": 0.1559920634920635
+    },
+    "BM25 Only": {
+      "Precision@5": 0.44999999999999996,
+      "Recall@5": 0.15357142857142858,
+      "NDCG@5": 0.49005614754339527,
+      "Precision@10": 0.25,
+      "Recall@10": 0.17023809523809524,
+      "NDCG@10": 0.3376124750710602,
+      "MAP": 0.14412698412698413
+    },
+    "Hybrid (BM25 + Semantic)": {
+      "Precision@5": 0.45,
+      "Recall@5": 0.15595238095238095,
+      "NDCG@5": 0.4841782093448699,
+      "Precision@10": 0.325,
+      "Recall@10": 0.2273809523809524,
+      "NDCG@10": 0.38606043724881944,
+      "MAP": 0.21904761904761905
+    }
+  },
+  "diversity_novelty_coverage": {
+    "Intra-List Diversity (ILD)": "0.376266",
+    "Category Diversity": 0.8345527288191289,
+    "Brand Diversity": 0.9611454895324133,
+    "Novelty": 0.2691423503233483,
+    "Catalog Coverage": 0.0008803677981023183
+  },
+  "cold_start": {
+    "new_user_queries_handled": 2,
+    "new_items_handled": 2,
+    "avg_recommendations_per_query": 10.0,
+    "avg_similar_items_found": 5.0
+  },
+  "scalability_efficiency": {
+    "query_performance": {
+      "mean_time_ms": 67.43329763412476,
+      "median_time_ms": 67.44050979614258,
+      "min_time_ms": 63.111066818237305,
+      "max_time_ms": 71.74110412597656,
+      "std_time_ms": 4.219861396322142,
+      "total_queries": 4
+    },
+    "memory_usage": {
+      "rss_mb": 464.6875,
+      "vms_mb": 426237.734375,
+      "percent": 5.6732177734375,
+      "dataset_size_mb": 52.96438407897949,
+      "tfidf_matrix_size_mb": 8.720741271972656,
+      "embeddings_size_mb": 59.900390625
+    },
+    "dataset_stats": {
+      "num_products": 40892,
+      "num_brands": 314,
+      "dataset_size_mb": 52.96438407897949
+    },
+    "embedding_generation": {
+      "total_time_ms": 32594.521045684814,
+      "items_processed": 40892,
+      "time_per_item_ms": 0.7970879645330337
+    }
+  }
+}

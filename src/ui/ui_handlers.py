@@ -10,7 +10,7 @@ from tkinter import messagebox
 from typing import List, Dict
 import webbrowser
 
-from ui_constants import BUDGET_MAP
+from src.ui.ui_constants import BUDGET_MAP
 
 logger = logging.getLogger(__name__)
 

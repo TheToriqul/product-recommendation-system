@@ -12,7 +12,7 @@ from typing import Optional
 from PIL import Image, ImageTk
 import os
 
-from ui_constants import (
+from src.ui.ui_constants import (
     BG_COLOR_INPUT, BG_COLOR_CARD, BG_COLOR_ENTRY, BORDER_COLOR,
     FG_COLOR_WHITE, FG_COLOR_TEXT, FG_COLOR_SECONDARY, SUCCESS_COLOR,
     FONT_FAMILY, FONT_SIZE_TITLE, FONT_SIZE_HEADING, FONT_SIZE_NORMAL, FONT_SIZE_BOLD,
@@ -497,3 +497,102 @@ def create_similar_section(parent: tk.Frame) -> ttk.Treeview:
     
     return similar_tree
 
+
+def create_evaluation_tab(parent: tk.Frame) -> tuple:
+    """
+    Create the evaluation tab with metrics display and controls.
+    
+    Args:
+        parent: Parent frame (tab)
+        
+    Returns:
+        Tuple of (metrics_canvas, buttons_frame, status_label, scrollable_frame)
+    """
+    from src.ui.ui_constants import (
+        BG_COLOR_CARD, BG_COLOR_ENTRY, BG_COLOR_MAIN, BG_COLOR_HOVER, FG_COLOR_WHITE, FG_COLOR_TEXT,
+        FG_COLOR_SECONDARY, SUCCESS_COLOR, FONT_FAMILY, FONT_SIZE_NORMAL,
+        FONT_SIZE_HEADING, BUTTON_PRIMARY, BUTTON_PRIMARY_HOVER, BORDER_COLOR
+    )
+    
+    # Main container
+    main_container = tk.Frame(parent, bg=BG_COLOR_MAIN)
+    main_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=15)
+    
+    # Header
+    header_frame = tk.Frame(main_container, bg=BG_COLOR_MAIN)
+    header_frame.pack(fill=tk.X, pady=(0, 15))
+    
+    tk.Label(
+        header_frame,
+        text="📊 System Evaluation & Performance Metrics",
+        font=(FONT_FAMILY, FONT_SIZE_HEADING + 2, 'bold'),
+        fg=FG_COLOR_WHITE,
+        bg=BG_COLOR_MAIN
+    ).pack(side=tk.LEFT)
+    
+    # Buttons frame
+    buttons_frame = tk.Frame(main_container, bg=BG_COLOR_MAIN)
+    buttons_frame.pack(fill=tk.X, pady=(0, 15))
+    
+    # Status label
+    status_label = tk.Label(
+        main_container,
+        text="No evaluation results loaded. Click 'Run Quick Evaluation' to generate metrics.",
+        bg=BG_COLOR_MAIN,
+        fg=FG_COLOR_SECONDARY,
+        font=(FONT_FAMILY, FONT_SIZE_NORMAL),
+        wraplength=1000,
+        justify=tk.LEFT
+    )
+    status_label.pack(fill=tk.X, pady=(0, 15))
+    
+    # Create scrollable canvas for metrics cards
+    canvas_frame = tk.Frame(main_container, bg=BG_COLOR_MAIN)
+    canvas_frame.pack(fill=tk.BOTH, expand=True)
+    
+    # Canvas with scrollbar
+    canvas = tk.Canvas(
+        canvas_frame,
+        bg=BG_COLOR_MAIN,
+        highlightthickness=0,
+        bd=0
+    )
+    
+    # Scrollbar
+    scrollbar = tk.Scrollbar(
+        canvas_frame,
+        orient=tk.VERTICAL,
+        command=canvas.yview,
+        bg=BG_COLOR_ENTRY,
+        troughcolor=BG_COLOR_MAIN,
+        activebackground=BG_COLOR_HOVER
+    )
+    
+    # Scrollable frame inside canvas
+    scrollable_frame = tk.Frame(canvas, bg=BG_COLOR_MAIN)
+    canvas_window = canvas.create_window((0, 0), window=scrollable_frame, anchor=tk.NW)
+    
+    # Configure scrollbar
+    def configure_scroll_region(event=None):
+        canvas.update_idletasks()
+        canvas.config(scrollregion=canvas.bbox("all"))
+    
+    def configure_canvas_width(event):
+        canvas_width = event.width
+        canvas.itemconfig(canvas_window, width=canvas_width)
+    
+    scrollable_frame.bind("<Configure>", configure_scroll_region)
+    canvas.bind("<Configure>", configure_canvas_width)
+    canvas.config(yscrollcommand=scrollbar.set)
+    
+    # Pack canvas and scrollbar
+    canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+    
+    # Mouse wheel scrolling
+    def on_mousewheel(event):
+        canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+    
+    canvas.bind_all("<MouseWheel>", on_mousewheel)
+    
+    return canvas, buttons_frame, status_label, scrollable_frame

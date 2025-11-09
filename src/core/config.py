@@ -9,7 +9,7 @@ from typing import Optional
 
 # Default configuration values
 DEFAULT_CONFIG = {
-    'csv_path': 'home appliance skus lowes.csv',
+    'csv_path': 'data/home appliance skus lowes.csv',
     'log_level': 'INFO',
 }
 

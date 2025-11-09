@@ -1,0 +1,89 @@
+================================================================================
+COMPREHENSIVE EVALUATION REPORT
+================================================================================
+Generated: 2025-11-09 22:45:33
+
+PERFORMANCE METRICS
+--------------------------------------------------------------------------------
+Precision@5:  0.4500 (0.0-1.0, higher is better)
+Precision@10: 0.3250 (0.0-1.0, higher is better)
+Recall@5:     0.1560 (0.0-1.0, higher is better)
+Recall@10:    0.2274 (0.0-1.0, higher is better)
+NDCG@5:       0.4842 (0.0-1.0, higher is better)
+NDCG@10:      0.3861 (0.0-1.0, higher is better)
+MAP:          0.2190 (0.0-1.0, higher is better)
+
+BASELINE COMPARISON
+--------------------------------------------------------------------------------
+
+Random:
+  Precision@5: 0.0000 (0.0-1.0, higher is better)
+  Recall@5: 0.0000 (0.0-1.0, higher is better)
+  NDCG@5: 0.0000 (0.0-1.0, higher is better)
+  Precision@10: 0.0000 (0.0-1.0, higher is better)
+  Recall@10: 0.0000 (0.0-1.0, higher is better)
+  NDCG@10: 0.0000 (0.0-1.0, higher is better)
+  MAP: 0.0000 (0.0-1.0, higher is better)
+
+TF-IDF Only:
+  Precision@5: 0.4500 (0.0-1.0, higher is better)
+  Recall@5: 0.1524 (0.0-1.0, higher is better)
+  NDCG@5: 0.5266 (0.0-1.0, higher is better)
+  Precision@10: 0.2500 (0.0-1.0, higher is better)
+  Recall@10: 0.1690 (0.0-1.0, higher is better)
+  NDCG@10: 0.3613 (0.0-1.0, higher is better)
+  MAP: 0.1560 (0.0-1.0, higher is better)
+
+BM25 Only:
+  Precision@5: 0.4500 (0.0-1.0, higher is better)
+  Recall@5: 0.1536 (0.0-1.0, higher is better)
+  NDCG@5: 0.4901 (0.0-1.0, higher is better)
+  Precision@10: 0.2500 (0.0-1.0, higher is better)
+  Recall@10: 0.1702 (0.0-1.0, higher is better)
+  NDCG@10: 0.3376 (0.0-1.0, higher is better)
+  MAP: 0.1441 (0.0-1.0, higher is better)
+
+Hybrid (BM25 + Semantic):
+  Precision@5: 0.4500 (0.0-1.0, higher is better)
+  Recall@5: 0.1560 (0.0-1.0, higher is better)
+  NDCG@5: 0.4842 (0.0-1.0, higher is better)
+  Precision@10: 0.3250 (0.0-1.0, higher is better)
+  Recall@10: 0.2274 (0.0-1.0, higher is better)
+  NDCG@10: 0.3861 (0.0-1.0, higher is better)
+  MAP: 0.2190 (0.0-1.0, higher is better)
+
+DIVERSITY, NOVELTY & COVERAGE
+--------------------------------------------------------------------------------
+Intra-List Diversity (ILD): 0.3762660026550293
+Category Diversity: 0.8346 (0.0-1.0, higher = more diverse/novel)
+Brand Diversity: 0.9611 (0.0-1.0, higher = more diverse/novel)
+Novelty: 0.2691 (0.0-1.0, higher = more diverse/novel)
+Catalog Coverage: 0.0009 (0.0-1.0, percentage of catalog)
+
+COLD START HANDLING
+--------------------------------------------------------------------------------
+new_user_queries_handled: 2
+new_items_handled: 2
+avg_recommendations_per_query: 10.00 (average count)
+avg_similar_items_found: 5.00 (average count)
+
+SCALABILITY & EFFICIENCY
+--------------------------------------------------------------------------------
+Mean Query Time: 67.43 ms (milliseconds, lower is better)
+Median Query Time: 67.44 ms
+Std Dev Query Time: 4.22 ms
+Memory Usage (RSS): 464.69 MB (megabytes)
+Memory Usage: 5.67% (percentage of system memory)
+Dataset Size: 40,892 products
+
+NOTES
+--------------------------------------------------------------------------------
+RMSE and MAE: These metrics are for rating prediction tasks.
+              Content-based filtering uses similarity scores, not ratings.
+              These metrics are more relevant for collaborative filtering.
+
+User-Item Interaction Matrix: Not applicable for content-based filtering.
+                                Content-based systems use item features, not user interactions.
+                                This matrix is required for collaborative filtering approaches.
+
+================================================================================
